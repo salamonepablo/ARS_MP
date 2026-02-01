@@ -101,6 +101,13 @@ MANIFEST
 # docker-compose.override.yml
 
 # -----------------------------------------------------------------------------
-# NOTE: docs/legacy_bd/ is NOT ignored (used as test data source)
-# Review file sizes and privacy before making repo public
+# Legacy database files (large files stored externally in Google Drive)
+# See docs/legacy_bd/README.md for download instructions
 # -----------------------------------------------------------------------------
+docs/legacy_bd/Accdb/
+docs/legacy_bd/Access20/
+*.mdb
+*.accdb
+
+# Keep the README with instructions
+!docs/legacy_bd/README.md

@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+/* Custom base styles */
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+}
+
+/* Custom component styles */
+@layer components {
+  /* Module card base */
+  .module-card {
+    @apply bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200;
+    @apply border border-gray-100;
+  }
+  
+  /* Fleet type badges */
+  .badge-csr {
+    @apply bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold;
+  }
+  
+  .badge-toshiba {
+    @apply bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-semibold;
+  }
+  
+  /* KPI card */
+  .kpi-card {
+    @apply bg-white rounded-lg shadow p-4 border-l-4;
+  }
+  
+  /* Metric display */
+  .metric-value {
+    @apply text-2xl font-bold text-gray-900;
+  }
+  
+  .metric-label {
+    @apply text-sm text-gray-500 uppercase tracking-wide;
+  }
+}
+
+/* Custom utilities */
+@layer utilities {
+  .text-shadow {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+}

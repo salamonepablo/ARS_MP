@@ -56,6 +56,9 @@ db.sqlite3-journal
 staticfiles/
 media/
 
+# Keep compiled Tailwind CSS (needed for deployment)
+!theme/static/css/dist/
+
 # -----------------------------------------------------------------------------
 # IDE and editor settings
 # -----------------------------------------------------------------------------
@@ -87,6 +90,12 @@ dist/
 .eggs/
 *.whl
 MANIFEST
+
+# -----------------------------------------------------------------------------
+# Node.js (Tailwind CSS)
+# -----------------------------------------------------------------------------
+node_modules/
+package-lock.json
 
 # -----------------------------------------------------------------------------
 # Jupyter Notebooks (if used for data exploration)

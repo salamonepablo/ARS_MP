@@ -1,0 +1,25 @@
+# Django core
+Django>=5.0,<6.0
+
+# Database
+psycopg[binary]>=3.2,<4.0
+
+# Environment and config
+python-dotenv>=1.0,<2.0
+
+# Frontend (Tailwind CSS)
+django-tailwind>=4.0,<5.0
+django-browser-reload>=1.0,<2.0
+
+# ETL dependencies
+pandas>=2.2,<3.0
+openpyxl>=3.1,<4.0
+pyodbc>=5.0,<6.0
+
+# Testing
+pytest>=8.0,<9.0
+pytest-django>=4.0,<5.0
+pytest-cov>=4.0,<5.0
+
+# Development
+ipython>=8.0,<9.0

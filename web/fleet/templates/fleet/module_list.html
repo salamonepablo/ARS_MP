@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Flota de Módulos{% endblock %}
+
+{% block content %}
+<div x-data="{ showFilters: false }">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Flota de Material Rodante Eléctrico</h1>
+        <p class="mt-2 text-gray-600">Línea Roca - {{ summary.total_count }} módulos activos</p>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <!-- Total KM del Mes -->
+        <div class="kpi-card border-blue-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="metric-label">KM Total del Mes</p>
+                    <p class="metric-value text-blue-600">{{ summary.total_km_month|floatformat:0 }}</p>
+                </div>
+                <div class="text-4xl">📊</div>
+            </div>
+            <div class="mt-2 text-xs text-gray-500">
+                {{ summary.total_count }} módulos
+            </div>
+        </div>
+
+        <!-- CSR KM del Mes -->
+        <div class="kpi-card border-green-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="metric-label">CSR - KM del Mes</p>
+                    <p class="metric-value text-green-600">{{ summary.csr_km_month|floatformat:0 }}</p>
+                </div>
+                <div class="text-4xl">🟢</div>
+            </div>
+            <div class="mt-2 text-xs text-gray-500">
+                {{ summary.csr_count }} módulos CSR
+            </div>
+        </div>
+
+        <!-- Toshiba KM del Mes -->
+        <div class="kpi-card border-yellow-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="metric-label">Toshiba - KM del Mes</p>
+                    <p class="metric-value text-yellow-600">{{ summary.toshiba_km_month|floatformat:0 }}</p>
+                </div>
+                <div class="text-4xl">🟡</div>
+            </div>
+            <div class="mt-2 text-xs text-gray-500">
+                {{ summary.toshiba_count }} módulos Toshiba
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="flex space-x-2 mb-6 border-b border-gray-200 pb-4">
+        <a href="?fleet=all" 
+           class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                  {% if fleet_filter == 'all' %}bg-blue-600 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+            Todos ({{ summary.total_count }})
+        </a>
+        <a href="?fleet=csr" 
+           class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                  {% if fleet_filter == 'csr' %}bg-green-600 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+            CSR ({{ summary.csr_count }})
+        </a>
+        <a href="?fleet=toshiba" 
+           class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                  {% if fleet_filter == 'toshiba' %}bg-yellow-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+            Toshiba ({{ summary.toshiba_count }})
+        </a>
+    </div>
+
+    <!-- Module Cards Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {% for module in modules %}
+        <div class="module-card p-4 hover:scale-[1.02] transition-transform duration-200">
+            <!-- Card Header -->
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-2">
+                    <span class="text-2xl font-bold text-gray-900">{{ module.module_id }}</span>
+                    <span class="{% if module.fleet_type == 'CSR' %}badge-csr{% else %}badge-toshiba{% endif %}">
+                        {{ module.fleet_type }}
+                    </span>
+                </div>
+                <span class="text-xs text-gray-400">
+                    {{ module.configuration|title }} ({{ module.coach_count }}c)
+                </span>
+            </div>
+
+            <!-- Metrics -->
+            <div class="space-y-3">
+                <!-- KM del Mes -->
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-gray-500 uppercase">KM Mes</span>
+                    <span class="font-semibold text-gray-900">{{ module.km_current_month|floatformat:0 }}</span>
+                </div>
+
+                <!-- KM Total -->
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-gray-500 uppercase">KM Total</span>
+                    <span class="font-semibold text-gray-900">{{ module.km_total_accumulated|floatformat:0 }}</span>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-100">
+
+                <!-- Último Mantenimiento -->
+                <div class="bg-gray-50 rounded-lg p-2">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs text-gray-500">Último Mant.</span>
+                        <span class="text-xs font-medium px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                            {{ module.last_maintenance_type }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-600">{{ module.last_maintenance_date|date:"d/m/Y" }}</span>
+                        <span class="text-gray-500">({{ module.days_since_maintenance }}d)</span>
+                    </div>
+                </div>
+
+                <!-- KM desde mantenimiento -->
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-gray-500 uppercase">KM desde Mant.</span>
+                    <span class="font-semibold {% if module.km_since_maintenance > 50000 %}text-red-600{% elif module.km_since_maintenance > 30000 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                        {{ module.km_since_maintenance|floatformat:0 }}
+                    </span>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full text-center py-12 text-gray-500">
+            No se encontraron módulos.
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

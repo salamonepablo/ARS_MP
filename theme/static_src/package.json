@@ -1,0 +1,12 @@
+{
+  "name": "ars_mp-theme",
+  "version": "1.0.0",
+  "description": "Tailwind CSS theme for ARS_MP",
+  "scripts": {
+    "build": "npx @tailwindcss/cli -i ./src/styles.css -o ../static/css/dist/styles.css --minify",
+    "dev": "npx @tailwindcss/cli -i ./src/styles.css -o ../static/css/dist/styles.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.0"
+  }
+}

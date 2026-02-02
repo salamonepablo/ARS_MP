@@ -7,6 +7,7 @@ Enfoque: **ETL** desde fuentes legacy (Access/CSV/Excel) y **visualizacion web**
 
 - Estructura base creada (capas `core/`, `etl/`, `web/`, `infrastructure/`, `tests/`, `docs/`).
 - Documentacion inicial y fuentes de prueba disponibles en `docs/legacy_bd/`.
+- **Vista de flota** con 111 tarjetas de modulos (CSR + Toshiba) con datos mock.
 
 ## Stack
 
@@ -14,10 +15,10 @@ Enfoque: **ETL** desde fuentes legacy (Access/CSV/Excel) y **visualizacion web**
 |------------|------------|
 | Lenguaje | Python 3.11+ |
 | Framework Web | Django 5.0+ |
-| Base de Datos | PostgreSQL 15+ |
-| ETL | pandas, openpyxl, pyodbc/sqlalchemy-access |
+| Base de Datos | PostgreSQL 15+ (SQLite en dev) |
+| ETL | pandas, openpyxl, pyodbc |
 | Frontend | Django Templates + HTMX + Alpine.js |
-| Estilos | Tailwind CSS |
+| Estilos | Tailwind CSS v4 |
 | Contenedores | Docker + Docker Compose |
 | Testing | pytest + coverage |
 
@@ -46,6 +47,8 @@ ARS_MP/
 │   ├── projections/
 │   ├── reports/
 │   └── api/
+├── theme/              # Tailwind CSS theme
+├── templates/          # Base templates
 ├── tests/
 ├── docs/
 └── context/
@@ -56,24 +59,70 @@ ARS_MP/
 ### 1) Crear entorno virtual
 
 ```powershell
-python -m venv .venv
+py -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
 ```
 
-### 2) Instalar dependencias (minimas iniciales)
-
-> Nota: este proyecto ira incorporando dependencias a medida que se implementen features.
+### 2) Instalar dependencias Python
 
 ```powershell
-pip install django pandas openpyxl pytest pytest-cov
+pip install -r requirements.txt
 ```
 
-### 3) Ejecutar tests
+### 3) Instalar dependencias Node.js (Tailwind CSS)
 
 ```powershell
-pytest
+cd theme/static_src
+npm install
+npm run build
+cd ../..
 ```
+
+### 4) Ejecutar migraciones
+
+```powershell
+py manage.py migrate
+```
+
+### 5) Iniciar servidor de desarrollo
+
+```powershell
+py manage.py runserver
+```
+
+Acceder a: **http://127.0.0.1:8000/fleet/modules/**
+
+### 6) (Opcional) Modo desarrollo con hot-reload de CSS
+
+En una terminal separada:
+
+```powershell
+cd theme/static_src
+npm run dev
+```
+
+## Vista de Flota
+
+La vista principal muestra **111 tarjetas** de modulos:
+
+- **86 Modulos CSR** (M01-M86)
+  - M01-M42: Cuadruplas (4 coches)
+  - M43-M86: Triplas (3 coches)
+- **25 Modulos Toshiba** (T01-T25)
+  - T01-T12: Cuadruplas (4 coches)
+  - T13-T25: Triplas (3 coches)
+
+Cada tarjeta muestra:
+- Kilometraje del mes actual
+- Kilometraje total acumulado
+- Ultimo mantenimiento (tipo, fecha, dias transcurridos)
+- KM desde ultimo mantenimiento
+
+### Filtros disponibles
+
+- `/fleet/modules/` - Todos los modulos
+- `/fleet/modules/?fleet=csr` - Solo CSR
+- `/fleet/modules/?fleet=toshiba` - Solo Toshiba
 
 ## Datos legacy de ejemplo
 

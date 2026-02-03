@@ -7,7 +7,9 @@ Provides views for displaying fleet module cards and KPIs.
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
 
-from .stub_data import get_all_modules, get_fleet_summary
+from etl.extractors.access_extractor import get_modules_with_fallback
+
+from .stub_data import get_fleet_summary
 
 
 @require_GET
@@ -15,9 +17,14 @@ def module_list(request):
     """
     Display all fleet modules as cards with summary KPIs.
 
+    Data source priority:
+    1. Access database (if configured and available)
+    2. Stub data (fallback for development/CI)
+
     URL: /fleet/modules/
     """
-    modules = get_all_modules()
+    # Get modules from Access or fallback to stub
+    modules = get_modules_with_fallback()
     summary = get_fleet_summary(modules)
 
     # Optional filtering by fleet type

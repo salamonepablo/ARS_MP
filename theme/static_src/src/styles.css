@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Content sources for Tailwind to scan */
+@source "../../../templates/**/*.html";
+@source "../../../web/**/templates/**/*.html";
+
 /* Custom base styles */
 @layer base {
   html {

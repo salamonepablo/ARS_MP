@@ -5,9 +5,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ARS_MP{% endblock %} - Maintenance Planner</title>
     
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS (CDN for development) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Trenes Argentinos corporate colors
+                        'ta': { 
+                            50: '#e6f7ff',
+                            100: '#b3e6ff', 
+                            200: '#80d4ff',
+                            300: '#4dc3ff',
+                            400: '#1ab2ff',
+                            500: '#00A3E0',  // Primary celeste
+                            600: '#0082b3',
+                            700: '#006186',
+                            800: '#004159',
+                            900: '#00202c',
+                        },
+                        'csr': { light: '#bbf7d0', DEFAULT: '#22c55e', dark: '#15803d' },
+                        'toshiba': { light: '#fde68a', DEFAULT: '#eab308', dark: '#a16207' },
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        .module-card {
+            @apply bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-200 border-l-4 border-l-ta-400 border border-ta-100 hover:border-ta-300;
+        }
+        .badge-csr {
+            @apply bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold;
+        }
+        .badge-toshiba {
+            @apply bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-semibold;
+        }
+        .kpi-card {
+            @apply bg-white rounded-lg shadow-md p-4 border-l-4;
+        }
+        .metric-value {
+            @apply text-2xl font-bold;
+        }
+        .metric-label {
+            @apply text-sm text-gray-500 uppercase tracking-wide;
+        }
+    </style>
+    
     {% load static %}
-    <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
     
     <!-- Inter font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,21 +68,21 @@
     
     {% block extra_head %}{% endblock %}
 </head>
-<body class="min-h-screen bg-gray-50">
+<body class="min-h-screen bg-ta-50">
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b border-gray-200">
+    <nav class="bg-ta-500 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
                     <a href="/" class="flex items-center space-x-2">
                         <span class="text-2xl">🚆</span>
-                        <span class="font-bold text-xl text-gray-900">ARS_MP</span>
+                        <span class="font-bold text-xl text-white">ARS_MP</span>
                     </a>
-                    <span class="ml-4 text-sm text-gray-500">Línea Roca</span>
+                    <span class="ml-4 text-sm text-ta-100">Linea Roca</span>
                 </div>
                 <div class="flex items-center space-x-4">
                     <a href="{% url 'fleet:module_list' %}" 
-                       class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                       class="text-ta-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors">
                         Flota
                     </a>
                 </div>
@@ -50,10 +96,10 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-white border-t border-gray-200 mt-auto">
+    <footer class="bg-ta-700 mt-auto">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <p class="text-center text-sm text-gray-500">
-                ARS_MP - Argentinian Rolling Stock Maintenance Planner
+            <p class="text-center text-sm text-ta-100">
+                ARS_MP - Argentinian Rolling Stock Maintenance Planner | Linea Roca
             </p>
         </div>
     </footer>

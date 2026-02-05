@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load fleet_filters %}
 
 {% block title %}Flota de Módulos{% endblock %}
 
@@ -6,70 +7,70 @@
 <div x-data="{ showFilters: false }">
     <!-- Page Header -->
     <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">Flota de Material Rodante Eléctrico</h1>
-        <p class="mt-2 text-gray-600">Línea Roca - {{ summary.total_count }} módulos activos</p>
+        <h1 class="text-3xl font-bold text-ta-700">Flota de Material Rodante Electrico</h1>
+        <p class="mt-2 text-ta-500">Linea Roca - {{ summary.total_count }} modulos activos</p>
     </div>
 
     <!-- KPI Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <!-- Total KM del Mes -->
-        <div class="kpi-card border-blue-500">
+        <div class="kpi-card border-ta-500 bg-gradient-to-br from-white to-ta-50">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="metric-label">KM Total del Mes</p>
-                    <p class="metric-value text-blue-600">{{ summary.total_km_month|floatformat:0 }}</p>
+                    <p class="metric-value text-ta-600">{{ summary.total_km_month|euro_number }}</p>
                 </div>
-                <div class="text-4xl">📊</div>
+                <div class="text-4xl opacity-80">🚆</div>
             </div>
-            <div class="mt-2 text-xs text-gray-500">
-                {{ summary.total_count }} módulos
+            <div class="mt-2 text-xs text-ta-600">
+                {{ summary.total_count }} modulos
             </div>
         </div>
 
         <!-- CSR KM del Mes -->
-        <div class="kpi-card border-green-500">
+        <div class="kpi-card border-green-500 bg-gradient-to-br from-white to-green-50">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="metric-label">CSR - KM del Mes</p>
-                    <p class="metric-value text-green-600">{{ summary.csr_km_month|floatformat:0 }}</p>
+                    <p class="metric-value text-green-600">{{ summary.csr_km_month|euro_number }}</p>
                 </div>
-                <div class="text-4xl">🟢</div>
+                <div class="text-4xl opacity-80">🟢</div>
             </div>
-            <div class="mt-2 text-xs text-gray-500">
-                {{ summary.csr_count }} módulos CSR
+            <div class="mt-2 text-xs text-green-600">
+                {{ summary.csr_count }} modulos CSR
             </div>
         </div>
 
         <!-- Toshiba KM del Mes -->
-        <div class="kpi-card border-yellow-500">
+        <div class="kpi-card border-yellow-500 bg-gradient-to-br from-white to-yellow-50">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="metric-label">Toshiba - KM del Mes</p>
-                    <p class="metric-value text-yellow-600">{{ summary.toshiba_km_month|floatformat:0 }}</p>
+                    <p class="metric-value text-yellow-600">{{ summary.toshiba_km_month|euro_number }}</p>
                 </div>
-                <div class="text-4xl">🟡</div>
+                <div class="text-4xl opacity-80">🟡</div>
             </div>
-            <div class="mt-2 text-xs text-gray-500">
-                {{ summary.toshiba_count }} módulos Toshiba
+            <div class="mt-2 text-xs text-yellow-600">
+                {{ summary.toshiba_count }} modulos Toshiba
             </div>
         </div>
     </div>
 
     <!-- Filter Tabs -->
-    <div class="flex space-x-2 mb-6 border-b border-gray-200 pb-4">
+    <div class="flex space-x-2 mb-6 border-b border-ta-200 pb-4">
         <a href="?fleet=all" 
            class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                  {% if fleet_filter == 'all' %}bg-blue-600 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                  {% if fleet_filter == 'all' %}bg-ta-500 text-white shadow-md{% else %}bg-white text-ta-600 hover:bg-ta-100 border border-ta-200{% endif %}">
             Todos ({{ summary.total_count }})
         </a>
         <a href="?fleet=csr" 
            class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                  {% if fleet_filter == 'csr' %}bg-green-600 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                  {% if fleet_filter == 'csr' %}bg-green-600 text-white shadow-md{% else %}bg-white text-green-600 hover:bg-green-50 border border-green-200{% endif %}">
             CSR ({{ summary.csr_count }})
         </a>
         <a href="?fleet=toshiba" 
            class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                  {% if fleet_filter == 'toshiba' %}bg-yellow-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                  {% if fleet_filter == 'toshiba' %}bg-yellow-500 text-white shadow-md{% else %}bg-white text-yellow-600 hover:bg-yellow-50 border border-yellow-200{% endif %}">
             Toshiba ({{ summary.toshiba_count }})
         </a>
     </div>
@@ -96,13 +97,13 @@
                 <!-- KM del Mes -->
                 <div class="flex justify-between items-center">
                     <span class="text-xs text-gray-500 uppercase">KM Mes</span>
-                    <span class="font-semibold text-gray-900">{{ module.km_current_month|floatformat:0 }}</span>
+                    <span class="font-semibold text-gray-900">{{ module.km_current_month|euro_number }}</span>
                 </div>
 
                 <!-- KM Total -->
                 <div class="flex justify-between items-center">
                     <span class="text-xs text-gray-500 uppercase">KM Total</span>
-                    <span class="font-semibold text-gray-900">{{ module.km_total_accumulated|floatformat:0 }}</span>
+                    <span class="font-semibold text-gray-900">{{ module.km_total_accumulated|euro_number }}</span>
                 </div>
 
                 <!-- Divider -->
@@ -126,7 +127,7 @@
                 <div class="flex justify-between items-center">
                     <span class="text-xs text-gray-500 uppercase">KM desde Mant.</span>
                     <span class="font-semibold {% if module.km_since_maintenance > 50000 %}text-red-600{% elif module.km_since_maintenance > 30000 %}text-yellow-600{% else %}text-green-600{% endif %}">
-                        {{ module.km_since_maintenance|floatformat:0 }}
+                        {{ module.km_since_maintenance|euro_number }}
                     </span>
                 </div>
             </div>

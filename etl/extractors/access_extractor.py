@@ -37,45 +37,56 @@ ORDER BY m.Módulos
 """
 
 # Get latest kilometraje for each module
+# Note: k.[Módulo] is a FK (numeric) to A_00_Módulos.Id_Módulos
+# Access shows it as text via Lookup, but the actual value is the numeric ID
 SQL_GET_LATEST_KM = """
 SELECT 
-    k.Módulo,
+    k.[Módulo] AS ModuloId,
     k.kilometraje,
     k.Fecha
-FROM A_00_Kilometrajes k
+FROM A_00_Kilometrajes AS k
 INNER JOIN (
-    SELECT Módulo, MAX(Fecha) as MaxFecha
+    SELECT [Módulo], MAX(Fecha) AS MaxFecha
     FROM A_00_Kilometrajes
-    GROUP BY Módulo
-) latest ON k.Módulo = latest.Módulo AND k.Fecha = latest.MaxFecha
+    GROUP BY [Módulo]
+) AS latest ON k.[Módulo] = latest.[Módulo] AND k.Fecha = latest.MaxFecha
 """
 
 # Get previous month kilometraje for km_month calculation
+# This query gets the oldest reading within the last 30 days of available data
+# Uses MAX(Fecha) from the table instead of Date() to handle historical data
 SQL_GET_PREV_MONTH_KM = """
 SELECT 
-    k.Módulo,
+    k.[Módulo] AS ModuloId,
     k.kilometraje,
     k.Fecha
-FROM A_00_Kilometrajes k
-WHERE k.Fecha >= DateAdd('m', -1, Date())
-ORDER BY k.Módulo, k.Fecha DESC
+FROM A_00_Kilometrajes AS k
+INNER JOIN (
+    SELECT [Módulo], MIN(Fecha) AS MinFecha
+    FROM A_00_Kilometrajes
+    WHERE Fecha >= DateAdd('d', -30, (SELECT MAX(Fecha) FROM A_00_Kilometrajes))
+    GROUP BY [Módulo]
+) AS oldest ON k.[Módulo] = oldest.[Módulo] AND k.Fecha = oldest.MinFecha
 """
 
 # Get last maintenance event for each module
+# Note: ot.[Módulo] is a FK (numeric) to A_00_Módulos.Id_Módulos
+# Maintenance codes are in the 'Tarea' field (IQ, IB, AN1-6, BA1-3, RS, RG, MEN, RB, etc.)
 SQL_GET_LAST_MAINTENANCE = """
 SELECT 
-    ot.Módulo,
+    ot.[Módulo] AS ModuloId,
     ot.Tipo_Tarea,
     ot.Tarea,
     ot.Km,
     ot.Fecha_Fin
-FROM A_00_OT_Simaf ot
+FROM A_00_OT_Simaf AS ot
 INNER JOIN (
-    SELECT Módulo, MAX(Fecha_Fin) as MaxFecha
+    SELECT [Módulo], MAX(Fecha_Fin) AS MaxFecha
     FROM A_00_OT_Simaf
-    WHERE Tipo_Tarea IN ('IQ', 'IB', 'AN', 'BA', 'RS', 'DA', 'PE', 'RG', 'MEN', 'RB')
-    GROUP BY Módulo
-) latest ON ot.Módulo = latest.Módulo AND ot.Fecha_Fin = latest.MaxFecha
+    WHERE Tarea IN ('IQ', 'IQ1', 'IQ2', 'IQ3', 'IB', 'AN1', 'AN2', 'AN3', 'AN4', 'AN5', 'AN6', 
+                    'BA1', 'BA2', 'BA3', 'RS', 'RG', 'MEN', 'RB')
+    GROUP BY [Módulo]
+) AS latest ON ot.[Módulo] = latest.[Módulo] AND ot.Fecha_Fin = latest.MaxFecha
 """
 
 
@@ -259,15 +270,20 @@ def get_modules_from_access() -> list[ModuleData]:
         cursor.execute(SQL_GET_MODULES)
         module_rows = cursor.fetchall()
         
-        # Get latest km per module
+        # Get latest km per module (keyed by ModuloId which is the numeric FK)
         logger.info("Fetching kilometraje data...")
         cursor.execute(SQL_GET_LATEST_KM)
-        km_data = {row.Módulo: row for row in cursor.fetchall()}
+        km_data = {row.ModuloId: row for row in cursor.fetchall()}
         
-        # Get last maintenance per module
+        # Get km from 30 days ago for km_month calculation
+        logger.info("Fetching previous month kilometraje data...")
+        cursor.execute(SQL_GET_PREV_MONTH_KM)
+        km_prev_data = {row.ModuloId: row for row in cursor.fetchall()}
+        
+        # Get last maintenance per module (keyed by ModuloId)
         logger.info("Fetching maintenance data...")
         cursor.execute(SQL_GET_LAST_MAINTENANCE)
-        maint_data = {row.Módulo: row for row in cursor.fetchall()}
+        maint_data = {row.ModuloId: row for row in cursor.fetchall()}
         
         # Build ModuleData objects
         for row in module_rows:
@@ -279,19 +295,32 @@ def get_modules_from_access() -> list[ModuleData]:
                 logger.debug(f"Skipping module with id {module_id}: no name")
                 continue
             
+            # Skip placeholder modules (M00, T00 are not real fleet units)
+            if module_name in ("M00", "T00"):
+                logger.debug(f"Skipping placeholder module: {module_name}")
+                continue
+            
             # Determine fleet type and configuration
             fleet_type = _determine_fleet_type(row.Tipo_MR, row.Marca_MR, module_name)
             configuration, coach_count = _determine_configuration(module_name, fleet_type)
             
-            # Get km data
+            # Get km data (lookup by module ID - FK relationship uses Id_Módulos)
             km_row = km_data.get(module_id)
             km_total = km_row.kilometraje if km_row else 0
-            km_month = 0  # TODO: Calculate from previous month diff
             
-            # Get maintenance data
+            # Calculate km_month as difference between current and 30 days ago
+            km_prev_row = km_prev_data.get(module_id)
+            if km_row and km_prev_row and km_total and km_prev_row.kilometraje:
+                km_month = int(km_total) - int(km_prev_row.kilometraje)
+                # Ensure non-negative (data quality issues may cause negative values)
+                km_month = max(0, km_month)
+            else:
+                km_month = 0
+            
+            # Get maintenance data (lookup by module ID - FK relationship uses Id_Módulos)
             maint_row = maint_data.get(module_id)
             last_maint_date = _parse_date(maint_row.Fecha_Fin) if maint_row else date.today()
-            last_maint_type = maint_row.Tipo_Tarea if maint_row else "N/A"
+            last_maint_type = maint_row.Tarea if maint_row else "N/A"  # Tarea has the maintenance code (IQ, IB, AN, etc.)
             km_at_maint = maint_row.Km if maint_row else 0
             
             # Create module data object

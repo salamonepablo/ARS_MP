@@ -57,9 +57,10 @@ def is_access_available() -> bool:
     Check if Access database connection is available.
     
     Checks:
-    1. Required environment variables are set (path is required, password optional)
-    2. Database file exists
-    3. ODBC driver is installed
+    1. Required environment variables are set (path is required)
+    2. Password is set (required for protected databases)
+    3. Database file exists
+    4. ODBC driver is installed
     
     Returns:
         True if all requirements are met, False otherwise.
@@ -72,14 +73,24 @@ def is_access_available() -> bool:
         return False
     
     # Check file exists
-    if not Path(db_path).exists():
-        logger.debug(f"Access database file not found: {db_path}")
+    path_obj = Path(db_path)
+    if not path_obj.is_absolute():
+        path_obj = Path.cwd() / db_path
+    
+    if not path_obj.exists():
+        logger.debug(f"Access database file not found: {path_obj}")
         return False
     
     # Check driver availability
     driver = _get_access_driver()
     if not driver:
         logger.debug("No suitable Access ODBC driver found")
+        return False
+    
+    # Check password (required for protected databases)
+    password = _get_env_var("LEGACY_ACCESS_DB_PASSWORD")
+    if not password:
+        logger.debug("Access database password not set (LEGACY_ACCESS_DB_PASSWORD)")
         return False
     
     return True

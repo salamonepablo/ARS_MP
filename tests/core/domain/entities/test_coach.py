@@ -11,7 +11,6 @@ import pytest
 
 from core.domain.entities.coach import Coach
 from core.domain.value_objects.coach_type import CoachType
-from core.domain.value_objects.unit_status import UnitStatus
 from core.domain.value_objects.unit_type import UnitType
 
 from .conftest import create_coach
@@ -162,7 +161,6 @@ class TestCoachValidation:
                 manufacturer="CSR Zhuzhou",
                 manufacture_date=None,
                 commissioning_date=future_date,
-                status=UnitStatus.AVAILABLE,
                 line="LR",
                 created_at=datetime.now(),
                 updated_at=datetime.now(),
@@ -187,7 +185,6 @@ class TestCoachValidation:
                 manufacturer="CSR Zhuzhou",
                 manufacture_date=date(2016, 1, 1),  # Después de commissioning
                 commissioning_date=date(2015, 1, 1),
-                status=UnitStatus.AVAILABLE,
                 line="LR",
                 created_at=datetime.now(),
                 updated_at=datetime.now(),
@@ -254,31 +251,6 @@ class TestCoachBehavior:
             unit_number="RP4822",
         )
         assert coach.is_trailer_coach() is True
-
-    def test_is_available_when_status_available(self):
-        """Coach disponible cuando status es AVAILABLE."""
-        coach = create_coach(status=UnitStatus.AVAILABLE)
-        assert coach.is_available() is True
-
-    def test_is_not_available_when_in_maintenance(self):
-        """Coach no disponible cuando está en mantenimiento."""
-        coach = create_coach(status=UnitStatus.IN_MAINTENANCE)
-        assert coach.is_available() is False
-
-    def test_is_in_workshop_when_in_maintenance(self):
-        """Coach en taller cuando está en mantenimiento."""
-        coach = create_coach(status=UnitStatus.IN_MAINTENANCE)
-        assert coach.is_in_workshop() is True
-
-    def test_is_in_workshop_when_under_repair(self):
-        """Coach en taller cuando está en reparación."""
-        coach = create_coach(status=UnitStatus.UNDER_REPAIR)
-        assert coach.is_in_workshop() is True
-
-    def test_is_not_in_workshop_when_available(self):
-        """Coach no en taller cuando está disponible."""
-        coach = create_coach(status=UnitStatus.AVAILABLE)
-        assert coach.is_in_workshop() is False
 
     def test_get_unit_type_returns_coach(self):
         """get_unit_type() retorna COACH."""

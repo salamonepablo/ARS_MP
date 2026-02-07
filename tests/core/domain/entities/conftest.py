@@ -14,7 +14,6 @@ from core.domain.entities.emu import EMU
 from core.domain.entities.emu_configuration import EmuConfiguration
 from core.domain.entities.formation import Formation
 from core.domain.value_objects.coach_type import CoachType
-from core.domain.value_objects.unit_status import UnitStatus
 
 
 def create_coach(
@@ -27,7 +26,6 @@ def create_coach(
     place: int | None = 1,
     seating_capacity: int = 52,
     emu_id=None,
-    status: UnitStatus = UnitStatus.AVAILABLE,
     line: str | None = "LR",
 ) -> Coach:
     """Factory function to create a Coach with sensible defaults."""
@@ -38,7 +36,6 @@ def create_coach(
         manufacturer=manufacturer,
         manufacture_date=date(2014, 3, 15),
         commissioning_date=date(2015, 1, 20),
-        status=status,
         line=line,
         created_at=datetime.now(),
         updated_at=datetime.now(),
@@ -174,7 +171,6 @@ def create_emu(
     voltage: int = 25000,
     max_speed: int = 120,
     total_passenger_capacity: int = 248,
-    status: UnitStatus = UnitStatus.AVAILABLE,
     line: str | None = "LR",
     formation_id=None,
     configuration_id=None,
@@ -190,7 +186,6 @@ def create_emu(
         manufacturer=manufacturer,
         manufacture_date=date(2014, 12, 1),
         commissioning_date=date(2015, 2, 1),
-        status=status,
         line=line,
         created_at=datetime.now(),
         updated_at=datetime.now(),
@@ -209,7 +204,6 @@ def create_formation(
     manufacturer: str = "CSR Zhuzhou",
     emus: list[EMU] | None = None,
     route: str | None = "Constitución - La Plata",
-    status: UnitStatus = UnitStatus.AVAILABLE,
     line: str | None = "LR",
 ) -> Formation:
     """Factory function to create a Formation with sensible defaults."""
@@ -223,7 +217,6 @@ def create_formation(
         manufacturer=manufacturer,
         manufacture_date=date(2014, 12, 1),
         commissioning_date=date(2015, 2, 1),
-        status=status,
         line=line,
         created_at=datetime.now(),
         updated_at=datetime.now(),

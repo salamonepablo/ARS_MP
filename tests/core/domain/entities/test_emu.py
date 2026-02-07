@@ -7,7 +7,6 @@ Verifies EMU creation, composition validation, and behavior.
 import pytest
 
 from core.domain.value_objects.coach_type import CoachType
-from core.domain.value_objects.unit_status import UnitStatus
 from core.domain.value_objects.unit_type import UnitType
 
 from .conftest import (
@@ -174,21 +173,6 @@ class TestEmuBehavior:
         """get_unit_type() retorna EMU."""
         emu = create_emu()
         assert emu.get_unit_type() == UnitType.EMU
-
-    def test_is_available_when_status_available(self):
-        """EMU disponible cuando status es AVAILABLE."""
-        emu = create_emu(status=UnitStatus.AVAILABLE)
-        assert emu.is_available() is True
-
-    def test_is_not_available_when_in_maintenance(self):
-        """EMU no disponible cuando está en mantenimiento."""
-        emu = create_emu(status=UnitStatus.IN_MAINTENANCE)
-        assert emu.is_available() is False
-
-    def test_is_in_workshop_when_under_repair(self):
-        """EMU en taller cuando está en reparación."""
-        emu = create_emu(status=UnitStatus.UNDER_REPAIR)
-        assert emu.is_in_workshop() is True
 
 
 class TestEmuConfiguration:

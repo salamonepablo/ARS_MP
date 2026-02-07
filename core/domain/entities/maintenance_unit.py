@@ -8,14 +8,9 @@ for all maintenance units in the railway system.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import TYPE_CHECKING
 from uuid import UUID
 
-from core.domain.value_objects.unit_status import UnitStatus
 from core.domain.value_objects.unit_type import UnitType
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass(kw_only=True)
@@ -24,8 +19,8 @@ class MaintenanceUnit(ABC):
     Base entity for all railway maintenance units.
 
     Can represent formations (complete trains), EMUs (electric multiple units),
-    or individual coaches. All share common attributes for identification,
-    lifecycle tracking, and operational status.
+    or individual coaches. All share common attributes for identification
+    and lifecycle tracking.
 
     Attributes:
         id: Unique identifier (UUID).
@@ -34,7 +29,6 @@ class MaintenanceUnit(ABC):
         manufacturer: Name of manufacturer (e.g., "CSR Zhuzhou", "Toshiba").
         manufacture_date: Date the unit was manufactured (optional).
         commissioning_date: Date the unit entered service.
-        status: Current operational status.
         line: Railway line identifier (e.g., "LR" for Línea Roca).
         created_at: Timestamp of record creation.
         updated_at: Timestamp of last record update.
@@ -50,7 +44,6 @@ class MaintenanceUnit(ABC):
     manufacturer: str
     manufacture_date: date | None
     commissioning_date: date
-    status: UnitStatus
     line: str | None
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
@@ -87,11 +80,3 @@ class MaintenanceUnit(ABC):
             and self.manufacture_date > self.commissioning_date
         ):
             raise ValueError("manufacture_date must be before commissioning_date")
-
-    def is_available(self) -> bool:
-        """Check if unit is available for service."""
-        return self.status == UnitStatus.AVAILABLE
-
-    def is_in_workshop(self) -> bool:
-        """Check if unit is currently in workshop for maintenance or repairs."""
-        return self.status.is_in_workshop

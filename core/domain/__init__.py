@@ -11,7 +11,7 @@ from core.domain.entities import (
     Formation,
     MaintenanceUnit,
 )
-from core.domain.value_objects import CoachType, UnitStatus, UnitType
+from core.domain.value_objects import CoachType, UnitType
 
 __all__ = [
     # Entities
@@ -21,7 +21,6 @@ __all__ = [
     "Formation",
     "EmuConfiguration",
     # Value Objects
-    "UnitStatus",
     "UnitType",
     "CoachType",
 ]

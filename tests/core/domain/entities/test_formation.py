@@ -6,7 +6,6 @@ Verifies Formation creation, composition validation, and behavior.
 
 import pytest
 
-from core.domain.value_objects.unit_status import UnitStatus
 from core.domain.value_objects.unit_type import UnitType
 
 from .conftest import (
@@ -192,21 +191,6 @@ class TestFormationBehavior:
         """get_unit_type() retorna FORMATION."""
         formation = create_formation()
         assert formation.get_unit_type() == UnitType.FORMATION
-
-    def test_is_available_when_status_available(self):
-        """Formación disponible cuando status es AVAILABLE."""
-        formation = create_formation(status=UnitStatus.AVAILABLE)
-        assert formation.is_available() is True
-
-    def test_is_not_available_when_disabled(self):
-        """Formación no disponible cuando está deshabilitada."""
-        formation = create_formation(status=UnitStatus.DISABLED)
-        assert formation.is_available() is False
-
-    def test_is_in_workshop_when_in_maintenance(self):
-        """Formación en taller cuando está en mantenimiento."""
-        formation = create_formation(status=UnitStatus.IN_MAINTENANCE)
-        assert formation.is_in_workshop() is True
 
 
 class TestFormationRealWorldScenarios:

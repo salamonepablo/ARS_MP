@@ -120,3 +120,16 @@ docs/legacy_bd/Access20/
 
 # Keep the README with instructions
 !docs/legacy_bd/README.md
+
+# -----------------------------------------------------------------------------
+# Context prompts and session files (internal use, add at project end if needed)
+# -----------------------------------------------------------------------------
+context/prompts/
+*.png
+*.jpg
+*.jpeg
+*.JPG
+*.PNG
+
+# Keep specific documentation images if needed
+!docs/images/

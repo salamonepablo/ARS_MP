@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "django_browser_reload",
     # Project apps
     "web.fleet",
+    "infrastructure.database",
 ]
 
 # Tailwind CSS configuration

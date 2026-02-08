@@ -6,9 +6,20 @@ Will be replaced by actual database queries in production.
 """
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Literal
+
+
+@dataclass
+class CoachInfo:
+    """Information about a single coach in an EMU composition."""
+
+    number: int  # Coach number (e.g., 5001, 4029)
+    coach_type: str  # Type description (e.g., "MC1", "R1", "Motriz Cabecera")
+
+    def __str__(self) -> str:
+        return f"{self.coach_type} {self.number}"
 
 
 @dataclass
@@ -25,6 +36,11 @@ class ModuleData:
     last_maintenance_date: date
     last_maintenance_type: str
     km_at_last_maintenance: int
+    # Coach composition (optional, populated from Access)
+    coaches: list[CoachInfo] = field(default_factory=list)
+    # Reference date for RG/commissioning
+    reference_date: date | None = None
+    reference_type: str = ""  # "RG" or "Puesta en Servicio"
 
     @property
     def km_since_maintenance(self) -> int:
@@ -35,6 +51,13 @@ class ModuleData:
     def days_since_maintenance(self) -> int:
         """Calculate days since last maintenance."""
         return (date.today() - self.last_maintenance_date).days
+
+    @property
+    def coach_composition_str(self) -> str:
+        """Return formatted coach composition string."""
+        if not self.coaches:
+            return ""
+        return " - ".join(str(c) for c in self.coaches)
 
 
 def generate_csr_modules() -> list[ModuleData]:

@@ -36,6 +36,7 @@ class ModuleData:
     last_maintenance_date: date
     last_maintenance_type: str
     km_at_last_maintenance: int
+    km_current_month_date: date | None = None
     # Coach composition (optional, populated from Access)
     coaches: list[CoachInfo] = field(default_factory=list)
     # Reference date for RG/commissioning
@@ -58,6 +59,34 @@ class ModuleData:
         if not self.coaches:
             return ""
         return " - ".join(str(c) for c in self.coaches)
+
+    @property
+    def km_current_month_label(self) -> str:
+        """Return Spanish month name for KM current month reference."""
+        if not self.km_current_month_date:
+            return ""
+        return _get_month_name_es(self.km_current_month_date.month)
+
+
+def _get_month_name_es(month_number: int) -> str:
+    """Return Spanish month name for a given month number (1-12)."""
+    months = [
+        "Enero",
+        "Febrero",
+        "Marzo",
+        "Abril",
+        "Mayo",
+        "Junio",
+        "Julio",
+        "Agosto",
+        "Septiembre",
+        "Octubre",
+        "Noviembre",
+        "Diciembre",
+    ]
+    if 1 <= month_number <= 12:
+        return months[month_number - 1]
+    return ""
 
 
 def generate_csr_modules() -> list[ModuleData]:
@@ -102,6 +131,7 @@ def generate_csr_modules() -> list[ModuleData]:
                 last_maintenance_date=last_maint_date,
                 last_maintenance_type=random.choice(maintenance_types),
                 km_at_last_maintenance=km_at_maint,
+                km_current_month_date=date.today(),
             )
         )
 
@@ -150,6 +180,7 @@ def generate_toshiba_modules() -> list[ModuleData]:
                 last_maintenance_date=last_maint_date,
                 last_maintenance_type=random.choice(maintenance_types),
                 km_at_last_maintenance=km_at_maint,
+                km_current_month_date=date.today(),
             )
         )
 
@@ -174,6 +205,12 @@ def get_fleet_summary(modules: list[ModuleData]) -> dict:
     csr_modules = [m for m in modules if m.fleet_type == "CSR"]
     toshiba_modules = [m for m in modules if m.fleet_type == "Toshiba"]
 
+    month_label = ""
+    for module in modules:
+        if module.km_current_month_label:
+            month_label = module.km_current_month_label
+            break
+
     return {
         "csr_count": len(csr_modules),
         "toshiba_count": len(toshiba_modules),
@@ -184,4 +221,5 @@ def get_fleet_summary(modules: list[ModuleData]) -> dict:
         "csr_km_total": sum(m.km_total_accumulated for m in csr_modules),
         "toshiba_km_total": sum(m.km_total_accumulated for m in toshiba_modules),
         "total_km_total": sum(m.km_total_accumulated for m in modules),
+        "km_month_label": month_label,
     }

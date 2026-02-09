@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: ars_mp_postgres
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ars_mp}
+      POSTGRES_USER: ${POSTGRES_USER:-ars_mp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ars_mp}
+    volumes:
+      - ars_mp_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  ars_mp_postgres_data:

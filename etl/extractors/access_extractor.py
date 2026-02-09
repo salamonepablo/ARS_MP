@@ -24,6 +24,49 @@ from .access_connection import (
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_ACCESS_QUERY_TIMEOUT_SECONDS = 30
+
+
+def _get_query_timeout_seconds() -> int:
+    timeout_raw = os.environ.get("LEGACY_ACCESS_QUERY_TIMEOUT", "").strip()
+    if not timeout_raw:
+        return DEFAULT_ACCESS_QUERY_TIMEOUT_SECONDS
+
+    try:
+        timeout = int(timeout_raw)
+    except ValueError:
+        logger.warning(
+            "Invalid LEGACY_ACCESS_QUERY_TIMEOUT value '%s'. Using default %s seconds.",
+            timeout_raw,
+            DEFAULT_ACCESS_QUERY_TIMEOUT_SECONDS,
+        )
+        return DEFAULT_ACCESS_QUERY_TIMEOUT_SECONDS
+
+    if timeout <= 0:
+        return 0
+
+    return timeout
+
+
+def _apply_query_timeout(cursor: Any, conn: Optional[Any] = None) -> None:
+    timeout = _get_query_timeout_seconds()
+    if timeout <= 0:
+        return
+
+    try:
+        cursor.timeout = timeout
+        return
+    except Exception as e:
+        logger.warning("Could not set cursor timeout (%s). Trying connection timeout.", e)
+
+    if conn is None:
+        return
+
+    try:
+        conn.timeout = timeout
+    except Exception as e:
+        logger.warning("Could not set connection timeout: %s", e)
+
 
 # SQL Queries for data extraction
 # Based on introspection of DB_CCEE_Programación 1.1.accdb
@@ -55,11 +98,34 @@ INNER JOIN A_00_Módulos m ON f.[Módulo] = m.Id_Módulos
 ORDER BY m.Módulos, f.Coches
 """
 
+# Get ordered coach composition using A_00_Coches positions
+SQL_GET_COACH_COMPOSITION_BY_POSITION = """
+SELECT
+    c.[Módulo] AS ModuloId,
+    m.Módulos,
+    c.Coche,
+    c.[Posición] AS Posicion
+FROM A_00_Coches AS c
+INNER JOIN A_00_Módulos AS m ON c.[Módulo] = m.Id_Módulos
+ORDER BY m.Módulos, c.[Posición]
+"""
+
+SQL_GET_COACH_COMPOSITION_BY_POSITION_NO_ACCENT = """
+SELECT
+    c.[Módulo] AS ModuloId,
+    m.Módulos,
+    c.Coche,
+    c.Posicion
+FROM A_00_Coches AS c
+INNER JOIN A_00_Módulos AS m ON c.[Módulo] = m.Id_Módulos
+ORDER BY m.Módulos, c.Posicion
+"""
+
 # Get latest kilometraje for each module
 # Note: k.[Módulo] is a FK (numeric) to A_00_Módulos.Id_Módulos
 # Access shows it as text via Lookup, but the actual value is the numeric ID
 SQL_GET_LATEST_KM = """
-SELECT 
+SELECT
     k.[Módulo] AS ModuloId,
     k.kilometraje,
     k.Fecha
@@ -69,6 +135,22 @@ INNER JOIN (
     FROM A_00_Kilometrajes
     GROUP BY [Módulo]
 ) AS latest ON k.[Módulo] = latest.[Módulo] AND k.Fecha = latest.MaxFecha
+"""
+
+# Get global max date for the kilometraje table
+SQL_GET_GLOBAL_MAX_KM_DATE = """
+SELECT MAX(Fecha) AS MaxFecha
+FROM A_00_Kilometrajes
+"""
+
+# Get all kilometraje rows within a date range
+SQL_GET_KM_RANGE = """
+SELECT
+    k.[Módulo] AS ModuloId,
+    k.kilometraje,
+    k.Fecha
+FROM A_00_Kilometrajes AS k
+WHERE k.Fecha >= ? AND k.Fecha <= ?
 """
 
 # Get previous month kilometraje for km_month calculation
@@ -88,6 +170,19 @@ INNER JOIN (
 ) AS oldest ON k.[Módulo] = oldest.[Módulo] AND k.Fecha = oldest.MinFecha
 """
 
+# Get previous kilometraje reading per module (regardless of date range)
+# Use a per-module TOP 1 query to avoid heavy correlated subqueries
+SQL_GET_PREV_KM_FOR_MODULE = """
+SELECT TOP 1
+    k.[Módulo] AS ModuloId,
+    k.kilometraje,
+    k.Fecha
+FROM A_00_Kilometrajes AS k
+WHERE k.[Módulo] = ? AND k.Fecha < ?
+ORDER BY k.Fecha DESC
+"""
+
+
 # Get last maintenance event for each module
 # Note: ot.[Módulo] is a FK (numeric) to A_00_Módulos.Id_Módulos
 # Maintenance codes are in the 'Tarea' field (IQ, IB, AN1-6, BA1-3, RS, RG, MEN, RB, etc.)
@@ -104,6 +199,23 @@ INNER JOIN (
     FROM A_00_OT_Simaf
     WHERE Tarea IN ('IQ', 'IQ1', 'IQ2', 'IQ3', 'IB', 'AN1', 'AN2', 'AN3', 'AN4', 'AN5', 'AN6', 
                     'BA1', 'BA2', 'BA3', 'RS', 'RG', 'MEN', 'RB')
+    GROUP BY [Módulo]
+) AS latest ON ot.[Módulo] = latest.[Módulo] AND ot.Fecha_Fin = latest.MaxFecha
+"""
+
+# Get last RG maintenance event for each module
+SQL_GET_LAST_RG = """
+SELECT
+    ot.[Módulo] AS ModuloId,
+    ot.Tipo_Tarea,
+    ot.Tarea,
+    ot.Km,
+    ot.Fecha_Fin
+FROM A_00_OT_Simaf AS ot
+INNER JOIN (
+    SELECT [Módulo], MAX(Fecha_Fin) AS MaxFecha
+    FROM A_00_OT_Simaf
+    WHERE Tarea = 'RG'
     GROUP BY [Módulo]
 ) AS latest ON ot.[Módulo] = latest.[Módulo] AND ot.Fecha_Fin = latest.MaxFecha
 """
@@ -235,24 +347,62 @@ def get_coach_composition_from_access() -> dict[int, list[CoachInfo]]:
     
     try:
         cursor = conn.cursor()
+        _apply_query_timeout(cursor, conn)
         logger.info("Fetching coach composition from Access database...")
-        cursor.execute(SQL_GET_COACH_COMPOSITION)
-        
-        for row in cursor.fetchall():
-            module_db_id = row.Id_Módulos
-            module_name = row.Módulos or ""
-            coach_number = row.Coches
-            description = row.Descripción
-            
-            # Determine fleet type from module name
-            fleet_type = "CSR" if module_name.startswith("M") else "Toshiba"
-            
-            # Normalize coach type
-            coach_type = _normalize_coach_type(description, fleet_type)
-            
-            coaches_by_module[module_db_id].append(
-                CoachInfo(number=coach_number, coach_type=coach_type)
-            )
+
+        try:
+            cursor.execute(SQL_GET_COACH_COMPOSITION_BY_POSITION)
+            for row in cursor.fetchall():
+                module_db_id = row.ModuloId
+                module_name = getattr(row, "Módulos", "") or ""
+                coach_number = getattr(row, "Coche", None) or getattr(row, "Coches", None)
+                position = getattr(row, "Posicion", None) or getattr(row, "Posición", None)
+
+                if coach_number is None or position is None:
+                    continue
+
+                fleet_type = "CSR" if module_name.startswith("M") else "Toshiba"
+                coach_type = _coach_type_from_position(int(position), fleet_type)
+
+                coaches_by_module[module_db_id].append(
+                    CoachInfo(number=int(coach_number), coach_type=coach_type)
+                )
+        except Exception as e:
+            logger.warning(f"Could not load ordered coach composition (accented): {e}.")
+            try:
+                cursor.execute(SQL_GET_COACH_COMPOSITION_BY_POSITION_NO_ACCENT)
+                for row in cursor.fetchall():
+                    module_db_id = row.ModuloId
+                    module_name = getattr(row, "Módulos", "") or ""
+                    coach_number = getattr(row, "Coche", None) or getattr(row, "Coches", None)
+                    position = getattr(row, "Posicion", None) or getattr(row, "Posición", None)
+
+                    if coach_number is None or position is None:
+                        continue
+
+                    fleet_type = "CSR" if module_name.startswith("M") else "Toshiba"
+                    coach_type = _coach_type_from_position(int(position), fleet_type)
+
+                    coaches_by_module[module_db_id].append(
+                        CoachInfo(number=int(coach_number), coach_type=coach_type)
+                    )
+            except Exception as e_alt:
+                logger.warning(
+                    f"Could not load ordered coach composition (no accent): {e_alt}. Falling back."
+                )
+                cursor.execute(SQL_GET_COACH_COMPOSITION)
+                for row in cursor.fetchall():
+                    module_db_id = row.Id_Módulos
+                    module_name = row.Módulos or ""
+                    coach_number = row.Coches
+                    description = row.Descripción
+
+                    fleet_type = "CSR" if module_name.startswith("M") else "Toshiba"
+                    coach_type = _normalize_coach_type(description, fleet_type)
+
+                    coaches_by_module[module_db_id].append(
+                        CoachInfo(number=coach_number, coach_type=coach_type)
+                    )
         
         logger.info(f"Loaded coach composition for {len(coaches_by_module)} modules")
         return dict(coaches_by_module)
@@ -275,6 +425,71 @@ def _parse_date(value: Any) -> Optional[date]:
     try:
         return datetime.strptime(str(value), "%Y-%m-%d").date()
     except ValueError:
+        return None
+
+
+def _normalize_module_id(value: Any) -> str:
+    """Normalize module identifiers to zero-padded format (e.g., "M01")."""
+    if value is None:
+        return ""
+    raw = str(value).strip().upper()
+    if not raw:
+        return ""
+
+    match = re.search(r"([A-Z])\s*0*(\d+)", raw)
+    if match:
+        prefix = match.group(1)
+        try:
+            num = int(match.group(2))
+        except ValueError:
+            return raw
+        return f"{prefix}{num:02d}"
+
+    return raw
+
+
+def _to_datetime(value: Any) -> Optional[datetime]:
+    """Normalize Access date/time values to datetime."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time())
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(str(value), fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _get_prev_km_for_module(
+    cursor: Any,
+    module_db_id: int,
+    latest_date: Optional[date],
+) -> Optional[Any]:
+    """
+    Get the previous kilometraje reading for a module using a lightweight query.
+
+    Args:
+        cursor: Active database cursor
+        module_db_id: Numeric module FK (A_00_Módulos.Id_Módulos)
+        latest_date: Latest reading date for this module
+
+    Returns:
+        Row with ModuloId, kilometraje, Fecha, or None if not available
+    """
+    if not module_db_id or not latest_date:
+        return None
+
+    try:
+        cursor.execute(SQL_GET_PREV_KM_FOR_MODULE, (module_db_id, latest_date))
+        return cursor.fetchone()
+    except Exception as e:
+        logger.warning(
+            f"Could not load previous kilometraje for module {module_db_id}: {e}"
+        )
         return None
 
 
@@ -354,6 +569,16 @@ def _determine_configuration(module_name: str, fleet_type: str) -> tuple[str, in
             return "tripla", 3
 
 
+def _coach_type_from_position(position: int, fleet_type: str) -> str:
+    """Map coach position to standard type code based on fleet rules."""
+    csr_map = {1: "MC1", 2: "R1", 3: "R2", 4: "MC2"}
+    toshiba_map = {1: "M", 2: "R", 3: "RP", 4: "M"}
+
+    if fleet_type == "CSR":
+        return csr_map.get(position, "?")
+    return toshiba_map.get(position, "?")
+
+
 def extract_module_data(
     row: Any,
     configuration: str,
@@ -404,11 +629,14 @@ def extract_module_data(
         "N/A"
     )
     
+    fleet_type_literal: Literal["CSR", "Toshiba"] = "CSR" if fleet_type == "CSR" else "Toshiba"
+    config_literal: Literal["tripla", "cuadrupla"] = "cuadrupla" if configuration == "cuadrupla" else "tripla"
+
     return ModuleData(
         module_id=module_id,
         module_number=module_number,
-        fleet_type=fleet_type,
-        configuration=configuration,
+        fleet_type=fleet_type_literal,
+        configuration=config_literal,
         coach_count=coach_count,
         km_current_month=int(km_month),
         km_total_accumulated=int(km_total),
@@ -443,49 +671,108 @@ def get_modules_from_access() -> list[ModuleData]:
     
     try:
         cursor = conn.cursor()
+        _apply_query_timeout(cursor, conn)
         
         # Get all modules
         logger.info("Fetching modules from Access database...")
         cursor.execute(SQL_GET_MODULES)
         module_rows = cursor.fetchall()
         
-        # Get latest km per module (keyed by ModuloId which is the numeric FK)
-        logger.info("Fetching kilometraje data...")
-        cursor.execute(SQL_GET_LATEST_KM)
-        km_data = {row.ModuloId: row for row in cursor.fetchall()}
-        
-        # Get km from 30 days ago for km_month calculation
-        logger.info("Fetching previous month kilometraje data...")
-        cursor.execute(SQL_GET_PREV_MONTH_KM)
-        km_prev_data = {row.ModuloId: row for row in cursor.fetchall()}
+        # Map module DB id to module name for consistent lookups
+        module_id_to_name = {
+            row.Id_Módulos: _normalize_module_id(row.Módulos)
+            for row in module_rows
+            if getattr(row, "Módulos", None)
+        }
+
+        # Cache for previous km readings (fallback when month data is missing)
+        km_prev_any_data: dict[str, Any] = {}
+
+        # Global max date to define the month window
+        logger.info("Fetching global kilometraje max date...")
+        cursor.execute(SQL_GET_GLOBAL_MAX_KM_DATE)
+        global_max_row = cursor.fetchone()
+        global_max_dt = _to_datetime(global_max_row.MaxFecha) if global_max_row else None
+
+        # Preload km readings for the global month window
+        km_month_rows: list[Any] = []
+        if global_max_dt:
+            month_start = datetime(global_max_dt.year, global_max_dt.month, 1)
+            logger.info("Fetching kilometraje for global month window...")
+            cursor.execute(SQL_GET_KM_RANGE, (month_start, global_max_dt))
+            km_month_rows = cursor.fetchall()
+
+        km_month_min: dict[str, Any] = {}
+        km_month_max: dict[str, Any] = {}
+        for row in km_month_rows:
+            module_raw = row.ModuloId
+            module_key = _normalize_module_id(module_id_to_name.get(module_raw) or module_raw)
+            if not module_key:
+                continue
+
+            row_date = _to_datetime(row.Fecha)
+            row_km = row.kilometraje
+            if row_km is None:
+                continue
+
+            if module_key not in km_month_min:
+                km_month_min[module_key] = row
+            else:
+                min_row = km_month_min[module_key]
+                min_date = _to_datetime(min_row.Fecha)
+                if row_date and min_date:
+                    if row_date < min_date or (row_date == min_date and row_km < min_row.kilometraje):
+                        km_month_min[module_key] = row
+
+            if module_key not in km_month_max:
+                km_month_max[module_key] = row
+            else:
+                max_row = km_month_max[module_key]
+                max_date = _to_datetime(max_row.Fecha)
+                if row_date and max_date:
+                    if row_date > max_date or (row_date == max_date and row_km > max_row.kilometraje):
+                        km_month_max[module_key] = row
+
         
         # Get last maintenance per module (keyed by ModuloId)
         logger.info("Fetching maintenance data...")
         cursor.execute(SQL_GET_LAST_MAINTENANCE)
         maint_data = {row.ModuloId: row for row in cursor.fetchall()}
+
+        # Get last RG maintenance per module (keyed by ModuloId)
+        logger.info("Fetching RG maintenance data...")
+        cursor.execute(SQL_GET_LAST_RG)
+        rg_data = {row.ModuloId: row for row in cursor.fetchall()}
         
         # Get coach composition per module
         logger.info("Fetching coach composition...")
-        cursor.execute(SQL_GET_COACH_COMPOSITION)
-        coaches_by_module: dict[int, list[CoachInfo]] = defaultdict(list)
-        for coach_row in cursor.fetchall():
-            module_db_id = coach_row.Id_Módulos
-            module_name = coach_row.Módulos or ""
-            coach_number = coach_row.Coches
-            description = coach_row.Descripción
-            
-            # Determine fleet type from module name
-            ft = "CSR" if module_name.startswith("M") else "Toshiba"
-            coach_type = _normalize_coach_type(description, ft)
-            
-            coaches_by_module[module_db_id].append(
-                CoachInfo(number=coach_number, coach_type=coach_type)
-            )
+        coaches_by_module = get_coach_composition_from_access()
         
+        # Get latest km per module (keyed by ModuloId which is the numeric FK)
+        logger.info("Fetching latest kilometraje data...")
+        cursor.execute(SQL_GET_LATEST_KM)
+        latest_rows = cursor.fetchall()
+        km_data: dict[str, Any] = {}
+        for row in latest_rows:
+            module_raw = row.ModuloId
+            module_key = _normalize_module_id(module_id_to_name.get(module_raw) or module_raw)
+            if not module_key:
+                continue
+
+            row_date = _to_datetime(row.Fecha)
+            if module_key not in km_data:
+                km_data[module_key] = row
+                continue
+            current = km_data[module_key]
+            current_date = _to_datetime(current.Fecha)
+            if row_date and current_date:
+                if row_date > current_date or (row_date == current_date and row.kilometraje > current.kilometraje):
+                    km_data[module_key] = row
+
         # Build ModuleData objects
         for row in module_rows:
             module_db_id = row.Id_Módulos
-            module_name = row.Módulos
+            module_name = _normalize_module_id(row.Módulos)
             
             # Skip rows without a valid module name
             if not module_name:
@@ -502,23 +789,56 @@ def get_modules_from_access() -> list[ModuleData]:
             configuration, coach_count = _determine_configuration(module_name, fleet_type)
             
             # Get km data (lookup by module ID - FK relationship uses Id_Módulos)
-            km_row = km_data.get(module_db_id)
+            module_key = _normalize_module_id(module_name)
+            km_row = km_data.get(module_key)
             km_total = km_row.kilometraje if km_row else 0
-            
-            # Calculate km_month as difference between current and 30 days ago
-            km_prev_row = km_prev_data.get(module_db_id)
-            if km_row and km_prev_row and km_total and km_prev_row.kilometraje:
-                km_month = int(km_total) - int(km_prev_row.kilometraje)
-                # Ensure non-negative (data quality issues may cause negative values)
-                km_month = max(0, km_month)
+            km_current_month_date = global_max_dt.date() if global_max_dt else _parse_date(km_row.Fecha) if km_row else None
+
+            # Calculate km_month as difference between max and min in global month window
+            month_min_row = km_month_min.get(module_key)
+            month_max_row = km_month_max.get(module_key)
+            if month_min_row and month_max_row:
+                min_km = month_min_row.kilometraje
+                max_km = month_max_row.kilometraje
+                if min_km is not None and max_km is not None:
+                    km_month = int(max_km) - int(min_km)
+                    km_month = max(0, km_month)
+                else:
+                    km_month = 0
             else:
-                km_month = 0
+                # Fallback: use previous reading (any previous)
+                km_prev_row = None
+                if km_row:
+                    if module_key not in km_prev_any_data:
+                        km_prev_any_data[module_key] = _get_prev_km_for_module(
+                            cursor,
+                            module_db_id,
+                            _parse_date(km_row.Fecha),
+                        )
+                    km_prev_row = km_prev_any_data.get(module_key)
+
+                if km_row and km_prev_row and km_total and km_prev_row.kilometraje:
+                    prev_km = km_prev_row.kilometraje
+                    if prev_km is not None:
+                        km_month = int(km_total) - int(prev_km)
+                        km_month = max(0, km_month)
+                    else:
+                        km_month = 0
+                else:
+                    km_month = 0
             
             # Get maintenance data (lookup by module ID - FK relationship uses Id_Módulos)
             maint_row = maint_data.get(module_db_id)
-            last_maint_date = _parse_date(maint_row.Fecha_Fin) if maint_row else date.today()
-            last_maint_type = maint_row.Tarea if maint_row else "N/A"  # Tarea has the maintenance code (IQ, IB, AN, etc.)
-            km_at_maint = maint_row.Km if maint_row else 0
+            rg_row = rg_data.get(module_db_id)
+
+            if fleet_type == "Toshiba" and rg_row:
+                last_maint_date = _parse_date(rg_row.Fecha_Fin) if rg_row else date.today()
+                last_maint_type = "RG"
+                km_at_maint = rg_row.Km if rg_row else 0
+            else:
+                last_maint_date = _parse_date(maint_row.Fecha_Fin) if maint_row else date.today()
+                last_maint_type = maint_row.Tarea if maint_row else "N/A"  # Tarea has the maintenance code (IQ, IB, AN, etc.)
+                km_at_maint = maint_row.Km if maint_row else 0
             
             # Get coach composition
             coaches = coaches_by_module.get(module_db_id, [])
@@ -553,6 +873,7 @@ def get_modules_from_access() -> list[ModuleData]:
                 coaches=coaches,
                 reference_date=reference_date,
                 reference_type=reference_type,
+                km_current_month_date=km_current_month_date,
             ))
         
         logger.info(f"Extracted {len(modules)} modules from Access database")

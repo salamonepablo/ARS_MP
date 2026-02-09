@@ -32,12 +32,14 @@ Configure the following in your `.env` file:
 | `LEGACY_ACCESS_DB_PATH` | Yes | Path to the `.accdb` file (relative or absolute) |
 | `LEGACY_ACCESS_DB_PASSWORD` | No | Database password (if protected) |
 | `LEGACY_ACCESS_ODBC_DRIVER` | No | Override driver name (auto-detected by default) |
+| `LEGACY_ACCESS_QUERY_TIMEOUT` | No | Query timeout in seconds (0 disables timeout, default 30) |
 
 Example `.env`:
 
 ```env
 LEGACY_ACCESS_DB_PATH=docs/legacy_bd/Accdb/DB_CCEE_Programación 1.1.accdb
 # LEGACY_ACCESS_DB_PASSWORD=  # Leave empty for unprotected databases
+# LEGACY_ACCESS_QUERY_TIMEOUT=30
 ```
 
 ## Architecture
@@ -148,3 +150,8 @@ Install the Microsoft Access Database Engine:
 
 - Check `LEGACY_ACCESS_DB_PASSWORD` if the database is protected
 - For unprotected databases, leave the password empty or unset
+
+### "Request stuck while loading the fleet view"
+
+- Set `LEGACY_ACCESS_QUERY_TIMEOUT` to a lower value (e.g., 10-20) to avoid long-running queries
+- If timeouts occur, the view falls back to stub data and logs a warning

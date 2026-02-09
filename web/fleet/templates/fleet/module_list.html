@@ -17,7 +17,9 @@
         <div class="kpi-card border-ta-500 bg-gradient-to-br from-white to-ta-50">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="metric-label">KM Total del Mes</p>
+                    <p class="metric-label">
+                        KM Total del Mes{% if summary.km_month_label %} ({{ summary.km_month_label }}){% endif %}
+                    </p>
                     <p class="metric-value text-ta-600">{{ summary.total_km_month|euro_number }}</p>
                 </div>
                 <div class="text-4xl opacity-80">🚆</div>
@@ -31,7 +33,9 @@
         <div class="kpi-card border-green-500 bg-gradient-to-br from-white to-green-50">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="metric-label">CSR - KM del Mes</p>
+                    <p class="metric-label">
+                        CSR - KM del Mes{% if summary.km_month_label %} ({{ summary.km_month_label }}){% endif %}
+                    </p>
                     <p class="metric-value text-green-600">{{ summary.csr_km_month|euro_number }}</p>
                 </div>
                 <div class="text-4xl opacity-80">🟢</div>
@@ -45,7 +49,9 @@
         <div class="kpi-card border-yellow-500 bg-gradient-to-br from-white to-yellow-50">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="metric-label">Toshiba - KM del Mes</p>
+                    <p class="metric-label">
+                        Toshiba - KM del Mes{% if summary.km_month_label %} ({{ summary.km_month_label }}){% endif %}
+                    </p>
                     <p class="metric-value text-yellow-600">{{ summary.toshiba_km_month|euro_number }}</p>
                 </div>
                 <div class="text-4xl opacity-80">🟡</div>
@@ -111,7 +117,9 @@
             <div class="space-y-3">
                 <!-- KM del Mes -->
                 <div class="flex justify-between items-center">
-                    <span class="text-xs text-gray-500 uppercase">KM Mes</span>
+                    <span class="text-xs text-gray-500 uppercase">
+                        KM Mes{% if module.km_current_month_label %} ({{ module.km_current_month_label }}){% endif %}
+                    </span>
                     <span class="font-semibold text-gray-900">{{ module.km_current_month|euro_number }}</span>
                 </div>
 

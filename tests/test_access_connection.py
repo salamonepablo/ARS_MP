@@ -9,6 +9,7 @@ from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
+from dotenv import load_dotenv
 
 # These imports will fail until we implement the modules (TDD RED)
 from etl.extractors.access_connection import (
@@ -17,10 +18,19 @@ from etl.extractors.access_connection import (
     is_access_available,
 )
 from etl.extractors.access_extractor import (
+    _get_query_timeout_seconds,
+    _get_prev_km_for_module,
     extract_module_data,
     get_modules_from_access,
 )
 from web.fleet.stub_data import ModuleData
+
+load_dotenv()
+
+REAL_DB_PATH = os.getenv(
+    "LEGACY_ACCESS_DB_PATH",
+    "docs/legacy_bd/Accdb/DB_CCEE_Programación 1.1.accdb",
+)
 
 
 class TestAccessConnectionAvailability:
@@ -138,6 +148,21 @@ class TestAccessConnection:
 class TestAccessDataExtraction:
     """Test data extraction from Access database."""
 
+    def test_get_query_timeout_defaults_to_30(self):
+        """Should default to 30 seconds when env is not set."""
+        with patch.dict(os.environ, {}, clear=True):
+            assert _get_query_timeout_seconds() == 30
+
+    def test_get_query_timeout_returns_zero_when_disabled(self):
+        """Should return 0 when env is set to 0."""
+        with patch.dict(os.environ, {"LEGACY_ACCESS_QUERY_TIMEOUT": "0"}, clear=True):
+            assert _get_query_timeout_seconds() == 0
+
+    def test_get_query_timeout_uses_default_on_invalid_value(self):
+        """Should fall back to default when env value is invalid."""
+        with patch.dict(os.environ, {"LEGACY_ACCESS_QUERY_TIMEOUT": "invalid"}, clear=True):
+            assert _get_query_timeout_seconds() == 30
+
     def test_extract_module_data_returns_module_data_objects(self):
         """Extracted data should be ModuleData instances."""
         mock_row = MagicMock()
@@ -168,6 +193,30 @@ class TestAccessDataExtraction:
             result = get_modules_from_access()
 
         assert isinstance(result, list)
+
+    def test_get_prev_km_for_module_returns_none_without_latest_date(self):
+        """Should return None and skip query when latest date is missing."""
+        mock_cursor = MagicMock()
+
+        result = _get_prev_km_for_module(mock_cursor, module_db_id=1, latest_date=None)
+
+        assert result is None
+        mock_cursor.execute.assert_not_called()
+
+    def test_get_prev_km_for_module_executes_query(self):
+        """Should execute query and return fetched row."""
+        mock_cursor = MagicMock()
+        expected_row = MagicMock()
+        mock_cursor.fetchone.return_value = expected_row
+        latest_date = date(2024, 1, 1)
+
+        result = _get_prev_km_for_module(mock_cursor, module_db_id=10, latest_date=latest_date)
+
+        assert result is expected_row
+        mock_cursor.execute.assert_called_once()
+        args, _ = mock_cursor.execute.call_args
+        assert "SELECT TOP 1" in args[0]
+        assert args[1] == (10, latest_date)
 
 
 class TestFallbackBehavior:
@@ -216,14 +265,11 @@ class TestIntegrationWithRealDatabase:
             return False
 
     @pytest.mark.skipif(
-        not os.path.exists("docs/legacy_bd/Accdb/DB_CCEE_Programación 1.1_old.accdb"),
-        reason="Access database file not available"
+        not os.path.exists(REAL_DB_PATH),
+        reason="Access database file not available",
     )
     def test_can_connect_to_real_database(self):
         """Should be able to connect to the real Access database."""
-        from dotenv import load_dotenv
-        load_dotenv()
-        
         if not is_access_available():
             pytest.skip("Access connection not available")
         
@@ -232,14 +278,11 @@ class TestIntegrationWithRealDatabase:
         conn.close()
 
     @pytest.mark.skipif(
-        not os.path.exists("docs/legacy_bd/Accdb/DB_CCEE_Programación 1.1_old.accdb"),
-        reason="Access database file not available"
+        not os.path.exists(REAL_DB_PATH),
+        reason="Access database file not available",
     )
     def test_can_extract_modules_from_real_database(self):
         """Should extract module data from real database."""
-        from dotenv import load_dotenv
-        load_dotenv()
-        
         if not is_access_available():
             pytest.skip("Access connection not available")
         

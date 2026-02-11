@@ -10,12 +10,20 @@ import logging
 import subprocess
 import sys
 
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
 
+from core.services.grid_projection import (
+    CYCLE_COLORS,
+    DEFAULT_AVG_MONTHLY_KM,
+    DEFAULT_MONTHS,
+    GridProjectionService,
+)
 from core.services.maintenance_projection import (
+    CSR_HEAVY_CYCLES,
     MaintenanceProjectionService,
+    TOSHIBA_HEAVY_CYCLES,
 )
 from etl.extractors.access_extractor import (
     get_module_detail_from_access,
@@ -249,3 +257,295 @@ def sync_trigger(request):
         )
 
     return JsonResponse({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Maintenance Planner (projection grid)
+# ---------------------------------------------------------------------------
+
+@require_GET
+def projection_grid(request):
+    """
+    Display the maintenance projection grid (Excel-like).
+
+    Shows accumulated km per heavy cycle per module, projected month
+    by month, with colour-coded cells when the threshold is exceeded.
+
+    Query parameters:
+        fleet: "csr" or "toshiba" (required)
+        months: number of months to project (default 18)
+        avg_km: average monthly km override (optional)
+
+    URL: /fleet/planner/
+    """
+    from datetime import date as _date
+
+    fleet_param = request.GET.get("fleet", "csr").lower()
+    fleet_type = "CSR" if fleet_param == "csr" else "Toshiba"
+
+    months = int(request.GET.get("months", DEFAULT_MONTHS))
+    months = max(1, min(months, 60))  # clamp 1-60
+
+    default_avg = DEFAULT_AVG_MONTHLY_KM[fleet_type]
+    avg_km = int(request.GET.get("avg_km", default_avg))
+
+    # Get modules and filter by fleet
+    all_modules = get_modules_with_fallback()
+    fleet_modules = [m for m in all_modules if m.fleet_type == fleet_type]
+
+    today = _date.today()
+
+    # Build modules_data for GridProjectionService
+    modules_data: list[dict] = []
+    for mod in fleet_modules:
+        # Load key_data if not populated (Access-sourced modules)
+        if not mod.maintenance_key_data and mod.module_db_id is not None:
+            if is_postgres_staging_available():
+                _, key_data = get_module_detail_from_postgres(
+                    module_db_id=mod.module_db_id,
+                    module_id=mod.module_id,
+                    fleet_type=mod.fleet_type,
+                    km_total=mod.km_total_accumulated,
+                    commissioning_date=mod.reference_date,
+                )
+                mod.maintenance_key_data = key_data
+            else:
+                _, key_data = get_module_detail_from_access(
+                    module_db_id=mod.module_db_id,
+                    module_id=mod.module_id,
+                    fleet_type=mod.fleet_type,
+                    km_total=mod.km_total_accumulated,
+                )
+                mod.maintenance_key_data = key_data
+
+        # Convert MaintenanceKeyData to dicts for the grid service
+        kd_list = [
+            {
+                "cycle_type": kd.cycle_type,
+                "cycle_km": kd.cycle_km,
+                "km_since": kd.km_since,
+            }
+            for kd in mod.maintenance_key_data
+        ]
+
+        modules_data.append({
+            "module_id": mod.module_id,
+            "fleet_type": mod.fleet_type,
+            "key_data": kd_list,
+        })
+
+    # Generate grid
+    grid = GridProjectionService.generate_grid(
+        modules_data=modules_data,
+        avg_monthly_km=avg_km,
+        months=months,
+        reference_date=today,
+    )
+    month_headers = GridProjectionService.get_month_headers(
+        months=months,
+        reference_date=today,
+    )
+
+    context = {
+        "grid": grid,
+        "month_headers": month_headers,
+        "fleet_type": fleet_type,
+        "fleet_param": fleet_param,
+        "months": months,
+        "avg_km": avg_km,
+        "avg_km_csr": DEFAULT_AVG_MONTHLY_KM["CSR"],
+        "avg_km_toshiba": DEFAULT_AVG_MONTHLY_KM["Toshiba"],
+    }
+
+    return render(request, "fleet/projection_grid.html", context)
+
+
+@require_GET
+def projection_export(request):
+    """
+    Export the projection grid to an Excel file with colour formatting.
+
+    Reuses the same grid generation logic as ``projection_grid`` and
+    writes it to an openpyxl workbook.
+
+    Query parameters: same as ``projection_grid``.
+
+    URL: /fleet/planner/export/
+    """
+    from datetime import date as _date
+    from io import BytesIO
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    fleet_param = request.GET.get("fleet", "csr").lower()
+    fleet_type = "CSR" if fleet_param == "csr" else "Toshiba"
+    months = int(request.GET.get("months", DEFAULT_MONTHS))
+    months = max(1, min(months, 60))
+    default_avg = DEFAULT_AVG_MONTHLY_KM[fleet_type]
+    avg_km = int(request.GET.get("avg_km", default_avg))
+
+    all_modules = get_modules_with_fallback()
+    fleet_modules = [m for m in all_modules if m.fleet_type == fleet_type]
+    today = _date.today()
+
+    # Build modules_data (same as grid view)
+    modules_data: list[dict] = []
+    for mod in fleet_modules:
+        if not mod.maintenance_key_data and mod.module_db_id is not None:
+            if is_postgres_staging_available():
+                _, key_data = get_module_detail_from_postgres(
+                    module_db_id=mod.module_db_id,
+                    module_id=mod.module_id,
+                    fleet_type=mod.fleet_type,
+                    km_total=mod.km_total_accumulated,
+                    commissioning_date=mod.reference_date,
+                )
+                mod.maintenance_key_data = key_data
+            else:
+                _, key_data = get_module_detail_from_access(
+                    module_db_id=mod.module_db_id,
+                    module_id=mod.module_id,
+                    fleet_type=mod.fleet_type,
+                    km_total=mod.km_total_accumulated,
+                )
+                mod.maintenance_key_data = key_data
+
+        kd_list = [
+            {
+                "cycle_type": kd.cycle_type,
+                "cycle_km": kd.cycle_km,
+                "km_since": kd.km_since,
+            }
+            for kd in mod.maintenance_key_data
+        ]
+        modules_data.append({
+            "module_id": mod.module_id,
+            "fleet_type": mod.fleet_type,
+            "key_data": kd_list,
+        })
+
+    grid = GridProjectionService.generate_grid(
+        modules_data=modules_data,
+        avg_monthly_km=avg_km,
+        months=months,
+        reference_date=today,
+    )
+    month_headers = GridProjectionService.get_month_headers(
+        months=months, reference_date=today,
+    )
+
+    # --- Build Excel workbook ---
+    # Colour mapping: Tailwind class -> openpyxl hex (no leading #)
+    FILL_MAP = {
+        "AN": PatternFill("solid", fgColor="DCFCE7"),  # green-100
+        "BA": PatternFill("solid", fgColor="FEF9C3"),  # yellow-100
+        "PE": PatternFill("solid", fgColor="E0F2FE"),  # sky-100
+        "DA": PatternFill("solid", fgColor="FEE2E2"),  # red-100
+        "RB": PatternFill("solid", fgColor="FEF9C3"),  # yellow-100
+        "RG": PatternFill("solid", fgColor="FEE2E2"),  # red-100
+    }
+    FONT_MAP = {
+        "AN": Font(color="166534", bold=True),   # green-800
+        "BA": Font(color="854D0E", bold=True),   # yellow-800
+        "PE": Font(color="075985", bold=True),    # sky-800
+        "DA": Font(color="991B1B", bold=True),    # red-800
+        "RB": Font(color="854D0E", bold=True),   # yellow-800
+        "RG": Font(color="991B1B", bold=True),    # red-800
+    }
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Proyeccion {fleet_type}"
+
+    # Header row
+    header_font = Font(bold=True, size=10)
+    header_fill = PatternFill("solid", fgColor="F3F4F6")  # gray-100
+    headers = ["Modulo", "Ciclo", "Umbral"] + month_headers
+
+    for col_idx, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+
+    # Data rows
+    current_row = 2
+    right_align = Alignment(horizontal="right")
+    center_align = Alignment(horizontal="center")
+
+    for module in grid:
+        for row_idx, cycle_row in enumerate(module.cycle_rows):
+            # Module ID (first cycle only)
+            if row_idx == 0:
+                mod_cell = ws.cell(
+                    row=current_row, column=1,
+                    value=module.module_id,
+                )
+                mod_cell.font = Font(bold=True)
+                if len(module.cycle_rows) > 1:
+                    ws.merge_cells(
+                        start_row=current_row,
+                        start_column=1,
+                        end_row=current_row + len(module.cycle_rows) - 1,
+                        end_column=1,
+                    )
+                    mod_cell.alignment = Alignment(
+                        horizontal="center", vertical="center",
+                    )
+
+            # Cycle type
+            ws.cell(
+                row=current_row, column=2,
+                value=cycle_row.cycle_type,
+            ).alignment = center_align
+
+            # Threshold
+            ws.cell(
+                row=current_row, column=3,
+                value=cycle_row.cycle_km,
+            ).alignment = right_align
+            ws.cell(row=current_row, column=3).number_format = "#,##0"
+
+            # Month cells
+            for m_idx, mp in enumerate(cycle_row.months):
+                cell = ws.cell(
+                    row=current_row, column=4 + m_idx,
+                    value=mp.km_accumulated,
+                )
+                cell.alignment = right_align
+                cell.number_format = "#,##0"
+
+                if mp.exceeded:
+                    fill = FILL_MAP.get(cycle_row.cycle_type)
+                    font = FONT_MAP.get(cycle_row.cycle_type)
+                    if fill:
+                        cell.fill = fill
+                    if font:
+                        cell.font = font
+
+            current_row += 1
+
+    # Column widths
+    ws.column_dimensions["A"].width = 10
+    ws.column_dimensions["B"].width = 8
+    ws.column_dimensions["C"].width = 12
+    for col in range(4, 4 + months):
+        ws.column_dimensions[get_column_letter(col)].width = 12
+
+    # Freeze panes (header + module/cycle/threshold columns)
+    ws.freeze_panes = "D2"
+
+    # Write to response
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"proyeccion_{fleet_type.lower()}_{today.isoformat()}.xlsx"
+    response = HttpResponse(
+        buf.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response

@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% load fleet_filters %}
+
+{% block title %}Man. Planner - {{ fleet_type }}{% endblock %}
+
+{% block content %}
+<div x-data="projectionGrid()" x-init="init()">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-ta-700">Maintenance Planner</h1>
+            <p class="text-sm text-ta-400">Proyeccion de mantenimiento pesado - Linea Roca</p>
+        </div>
+        <a href="{% url 'fleet:module_list' %}"
+           class="text-sm text-ta-500 hover:text-ta-700 transition-colors">
+            &larr; Volver a Flota
+        </a>
+    </div>
+
+    <!-- Controls -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+        <form method="get" action="{% url 'fleet:projection_grid' %}" class="flex flex-wrap items-end gap-4">
+
+            <!-- Fleet selector -->
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Flota</label>
+                <div class="flex rounded-lg overflow-hidden border border-gray-300">
+                    <button type="submit" name="fleet" value="csr"
+                        class="px-4 py-2 text-sm font-medium transition-colors
+                               {% if fleet_param == 'csr' %}bg-green-600 text-white{% else %}bg-white text-gray-600 hover:bg-green-50{% endif %}">
+                        CSR
+                    </button>
+                    <button type="submit" name="fleet" value="toshiba"
+                        class="px-4 py-2 text-sm font-medium transition-colors border-l border-gray-300
+                               {% if fleet_param == 'toshiba' %}bg-yellow-500 text-white{% else %}bg-white text-gray-600 hover:bg-yellow-50{% endif %}">
+                        Toshiba
+                    </button>
+                </div>
+            </div>
+
+            <!-- Months -->
+            <div>
+                <label for="months" class="block text-xs text-gray-500 mb-1">Meses</label>
+                <input type="number" name="months" id="months" value="{{ months }}"
+                       min="1" max="60"
+                       class="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-ta-500 focus:border-ta-500">
+            </div>
+
+            <!-- Avg KM -->
+            <div>
+                <label for="avg_km" class="block text-xs text-gray-500 mb-1">KM Prom. Mensual</label>
+                <input type="number" name="avg_km" id="avg_km" value="{{ avg_km }}"
+                       min="1000" step="500"
+                       class="w-28 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-ta-500 focus:border-ta-500">
+            </div>
+
+            <!-- Hidden fleet for months/avg_km submit -->
+            <input type="hidden" name="fleet" value="{{ fleet_param }}">
+
+            <!-- Generate -->
+            <button type="submit"
+                    class="px-4 py-2 bg-ta-600 text-white rounded-lg hover:bg-ta-700 transition-colors text-sm font-medium">
+                Generar Proyeccion
+            </button>
+
+            <!-- Export -->
+            <button type="button" @click="exportExcel()"
+                    class="px-4 py-2 bg-white text-ta-600 border border-ta-300 rounded-lg hover:bg-ta-50 transition-colors text-sm font-medium">
+                Exportar a Excel
+            </button>
+        </form>
+    </div>
+
+    <!-- Grid Table -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-xs">
+                <!-- Header -->
+                <thead class="bg-gray-50 sticky top-0 z-10">
+                    <tr>
+                        <th class="sticky left-0 z-20 bg-gray-50 px-3 py-2 text-left font-semibold text-gray-700 border-b border-r border-gray-200 min-w-[80px]">
+                            Modulo
+                        </th>
+                        <th class="sticky left-[80px] z-20 bg-gray-50 px-3 py-2 text-left font-semibold text-gray-700 border-b border-r border-gray-200 min-w-[60px]">
+                            Ciclo
+                        </th>
+                        <th class="sticky left-[140px] z-20 bg-gray-50 px-2 py-2 text-right font-semibold text-gray-700 border-b border-r border-gray-200 min-w-[70px]">
+                            Umbral
+                        </th>
+                        {% for header in month_headers %}
+                        <th class="px-2 py-2 text-center font-medium text-gray-600 border-b border-gray-200 min-w-[80px] whitespace-nowrap">
+                            {{ header }}
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for module in grid %}
+                        {% for row in module.cycle_rows %}
+                        <tr class="{% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-50/50{% endif %} hover:bg-blue-50/30 transition-colors"
+                            data-module="{{ module.module_id }}"
+                            data-cycle="{{ row.cycle_type }}">
+
+                            <!-- Module ID (only on first cycle row) -->
+                            {% if forloop.first %}
+                            <td class="sticky left-0 z-10 bg-white px-3 py-1.5 font-bold text-gray-900 border-b border-r border-gray-200 {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-50/50{% endif %}"
+                                rowspan="{{ module.cycle_rows|length }}">
+                                {{ module.module_id }}
+                            </td>
+                            {% endif %}
+
+                            <!-- Cycle type badge -->
+                            <td class="sticky left-[80px] z-10 bg-white px-3 py-1.5 border-b border-r border-gray-200 {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-50/50{% endif %}">
+                                <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold {{ row.color_bg }} {{ row.color_text }}">
+                                    {{ row.cycle_type }}
+                                </span>
+                            </td>
+
+                            <!-- Threshold -->
+                            <td class="sticky left-[140px] z-10 bg-white px-2 py-1.5 text-right text-gray-500 border-b border-r border-gray-200 {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-50/50{% endif %}">
+                                {{ row.cycle_km|euro_number }}
+                            </td>
+
+                            <!-- Month cells -->
+                            {% for cell in row.months %}
+                            <td class="px-2 py-1.5 text-right border-b border-gray-100 cursor-pointer select-none whitespace-nowrap
+                                       {% if cell.exceeded %}{{ row.color_bg }} {{ row.color_text }} font-semibold{% else %}text-gray-600{% endif %}"
+                                data-module-id="{{ module.module_id }}"
+                                data-cycle-type="{{ row.cycle_type }}"
+                                data-month-idx="{{ forloop.counter0 }}"
+                                data-original-km="{{ cell.km_accumulated }}"
+                                data-exceeded="{{ cell.exceeded|yesno:'true,false' }}"
+                                @dblclick="handleDblClick($event, '{{ module.module_id }}', '{{ row.cycle_type }}', {{ forloop.counter0 }}, {{ cell.km_accumulated }})">
+                                <span class="cell-value">{{ cell.km_accumulated|euro_number }}</span>
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    {% empty %}
+                        <tr>
+                            <td colspan="{{ month_headers|length|add:3 }}" class="text-center py-8 text-gray-400">
+                                No hay datos disponibles para esta flota.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="mt-4 flex flex-wrap gap-4 text-xs text-gray-500">
+        <span class="font-medium">Semaforo:</span>
+        {% if fleet_param == 'csr' %}
+        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-100 border border-green-300"></span> AN ({{ "187500"|euro_number }} km)</span>
+        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-yellow-100 border border-yellow-300"></span> BA ({{ "375000"|euro_number }} km)</span>
+        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-sky-100 border border-sky-300"></span> PE ({{ "750000"|euro_number }} km)</span>
+        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-red-100 border border-red-300"></span> DA ({{ "1500000"|euro_number }} km)</span>
+        {% else %}
+        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-yellow-100 border border-yellow-300"></span> RB ({{ "300000"|euro_number }} km)</span>
+        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-red-100 border border-red-300"></span> RG ({{ "600000"|euro_number }} km)</span>
+        {% endif %}
+        <span class="ml-4 text-gray-400">Doble click en celda para marcar intervencion</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function projectionGrid() {
+    return {
+        // Track user interventions: { "M01-AN-3": true }  (module-cycle-monthIdx)
+        interventions: {},
+
+        // Hierarchy definitions (higher resets lower)
+        hierarchyCSR: ['DA', 'PE', 'BA', 'AN'],
+        hierarchyToshiba: ['RG', 'RB'],
+
+        init() {
+            // Nothing to initialize yet
+        },
+
+        /**
+         * Handle double-click on a cell to toggle intervention mark.
+         * When marked: shows cycle type code (e.g. "AN"), resets km.
+         * When unmarked: restores original km value.
+         * Hierarchy: marking a cycle resets all lower cycles at that month.
+         */
+        handleDblClick(event, moduleId, cycleType, monthIdx, originalKm) {
+            const key = `${moduleId}-${cycleType}-${monthIdx}`;
+            const cell = event.currentTarget;
+            const span = cell.querySelector('.cell-value');
+            const fleetType = '{{ fleet_param }}';
+            const hierarchy = fleetType === 'csr' ? this.hierarchyCSR : this.hierarchyToshiba;
+            const cycleIndex = hierarchy.indexOf(cycleType);
+
+            if (this.interventions[key]) {
+                // UNMARK: restore original values
+                delete this.interventions[key];
+                this.restoreCell(cell, span, originalKm);
+                // Restore heir cells
+                this.restoreHeirs(moduleId, cycleType, monthIdx, hierarchy, cycleIndex);
+            } else {
+                // MARK intervention
+                this.interventions[key] = true;
+                span.textContent = cycleType;
+                // Remove exceeded styling, add intervention style
+                cell.className = cell.className
+                    .replace(/bg-\w+-100/g, '')
+                    .replace(/text-\w+-800/g, '')
+                    .replace(/font-semibold/g, '');
+                cell.classList.add('bg-blue-100', 'text-blue-800', 'font-bold', 'text-center');
+
+                // Reset heir cycles (lower hierarchy) at this month
+                this.resetHeirs(moduleId, cycleType, monthIdx, hierarchy, cycleIndex);
+            }
+        },
+
+        /**
+         * Reset lower-hierarchy cycle cells at the intervention month.
+         * Sets them to "0" and recalculates subsequent months.
+         */
+        resetHeirs(moduleId, cycleType, monthIdx, hierarchy, cycleIndex) {
+            if (cycleIndex < 0) return;
+            const avgKm = parseInt('{{ avg_km }}');
+
+            // All cycles below this one in the hierarchy
+            for (let i = cycleIndex + 1; i < hierarchy.length; i++) {
+                const heirCycle = hierarchy[i];
+                // Find the row for this heir cycle
+                const heirCells = document.querySelectorAll(
+                    `td[data-module-id="${moduleId}"][data-cycle-type="${heirCycle}"]`
+                );
+
+                let accumulated = 0;
+                heirCells.forEach((heirCell, idx) => {
+                    const heirSpan = heirCell.querySelector('.cell-value');
+                    if (idx < monthIdx) {
+                        // Before intervention: keep original
+                        return;
+                    } else if (idx === monthIdx) {
+                        // At intervention month: set to 0
+                        heirSpan.textContent = '0';
+                        accumulated = 0;
+                        // Clear exceeded styling
+                        heirCell.className = heirCell.className
+                            .replace(/bg-\w+-100/g, '')
+                            .replace(/text-\w+-800/g, '')
+                            .replace(/font-semibold/g, '');
+                        heirCell.classList.add('text-gray-600');
+                        heirCell.dataset.overrideKm = '0';
+                    } else {
+                        // After intervention: accumulate from 0
+                        accumulated += avgKm;
+                        heirSpan.textContent = this.formatNumber(accumulated);
+                        // Check threshold
+                        const threshold = parseInt(
+                            heirCell.closest('tr').querySelector('td:nth-child(3)').textContent.replace(/\./g, '')
+                        );
+                        heirCell.className = heirCell.className
+                            .replace(/bg-\w+-100/g, '')
+                            .replace(/text-\w+-800/g, '')
+                            .replace(/font-semibold/g, '');
+                        if (accumulated >= threshold) {
+                            // Re-apply exceeded color from the row
+                            const badge = heirCell.closest('tr').querySelector('span[class*="bg-"]');
+                            if (badge) {
+                                const bgClass = Array.from(badge.classList).find(c => c.startsWith('bg-'));
+                                const textClass = Array.from(badge.classList).find(c => c.startsWith('text-'));
+                                if (bgClass) heirCell.classList.add(bgClass);
+                                if (textClass) heirCell.classList.add(textClass);
+                                heirCell.classList.add('font-semibold');
+                            }
+                        } else {
+                            heirCell.classList.add('text-gray-600');
+                        }
+                        heirCell.dataset.overrideKm = String(accumulated);
+                    }
+                });
+            }
+        },
+
+        /**
+         * Restore heir cells to their original values when unmarking.
+         */
+        restoreHeirs(moduleId, cycleType, monthIdx, hierarchy, cycleIndex) {
+            if (cycleIndex < 0) return;
+
+            for (let i = cycleIndex + 1; i < hierarchy.length; i++) {
+                const heirCycle = hierarchy[i];
+                const heirCells = document.querySelectorAll(
+                    `td[data-module-id="${moduleId}"][data-cycle-type="${heirCycle}"]`
+                );
+
+                heirCells.forEach((heirCell, idx) => {
+                    if (idx < monthIdx) return;
+                    const origKm = parseInt(heirCell.dataset.originalKm);
+                    const exceeded = heirCell.dataset.exceeded === 'true';
+                    const heirSpan = heirCell.querySelector('.cell-value');
+
+                    heirSpan.textContent = this.formatNumber(origKm);
+                    delete heirCell.dataset.overrideKm;
+
+                    // Restore original styling
+                    heirCell.className = heirCell.className
+                        .replace(/bg-\w+-100/g, '')
+                        .replace(/text-\w+-800/g, '')
+                        .replace(/font-semibold/g, '')
+                        .replace(/font-bold/g, '')
+                        .replace(/text-center/g, '');
+
+                    if (exceeded) {
+                        const badge = heirCell.closest('tr').querySelector('span[class*="bg-"]');
+                        if (badge) {
+                            const bgClass = Array.from(badge.classList).find(c => c.startsWith('bg-'));
+                            const textClass = Array.from(badge.classList).find(c => c.startsWith('text-'));
+                            if (bgClass) heirCell.classList.add(bgClass);
+                            if (textClass) heirCell.classList.add(textClass);
+                            heirCell.classList.add('font-semibold');
+                        }
+                    } else {
+                        heirCell.classList.add('text-gray-600');
+                    }
+                });
+            }
+        },
+
+        restoreCell(cell, span, originalKm) {
+            const exceeded = cell.dataset.exceeded === 'true';
+            span.textContent = this.formatNumber(originalKm);
+
+            cell.className = cell.className
+                .replace(/bg-\w+-100/g, '')
+                .replace(/text-\w+-800/g, '')
+                .replace(/font-bold/g, '')
+                .replace(/text-center/g, '');
+
+            if (exceeded) {
+                const badge = cell.closest('tr').querySelector('span[class*="bg-"]');
+                if (badge) {
+                    const bgClass = Array.from(badge.classList).find(c => c.startsWith('bg-'));
+                    const textClass = Array.from(badge.classList).find(c => c.startsWith('text-'));
+                    if (bgClass) cell.classList.add(bgClass);
+                    if (textClass) cell.classList.add(textClass);
+                    cell.classList.add('font-semibold');
+                }
+            } else {
+                cell.classList.add('text-gray-600');
+            }
+        },
+
+        formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        },
+
+        exportExcel() {
+            // Build URL with current params
+            const params = new URLSearchParams(window.location.search);
+            window.location.href = '{% url "fleet:projection_grid" %}export/?' + params.toString();
+        }
+    };
+}
+</script>
+{% endblock %}

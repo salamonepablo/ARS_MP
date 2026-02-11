@@ -18,7 +18,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="metric-label">
-                        KM Total del Mes{% if summary.km_month_label %} ({{ summary.km_month_label }}){% endif %}
+                        KM Total del Mes{% if summary.km_month_label %} (<span class="font-bold">{{ summary.km_month_label }}</span>){% endif %}
                     </p>
                     <p class="metric-value text-ta-600">{{ summary.total_km_month|euro_number }}</p>
                 </div>
@@ -34,7 +34,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="metric-label">
-                        CSR - KM del Mes{% if summary.km_month_label %} ({{ summary.km_month_label }}){% endif %}
+                        CSR - KM del Mes{% if summary.km_month_label %} (<span class="font-bold">{{ summary.km_month_label }}</span>){% endif %}
                     </p>
                     <p class="metric-value text-green-600">{{ summary.csr_km_month|euro_number }}</p>
                 </div>
@@ -50,7 +50,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="metric-label">
-                        Toshiba - KM del Mes{% if summary.km_month_label %} ({{ summary.km_month_label }}){% endif %}
+                        Toshiba - KM del Mes{% if summary.km_month_label %} (<span class="font-bold">{{ summary.km_month_label }}</span>){% endif %}
                     </p>
                     <p class="metric-value text-yellow-600">{{ summary.toshiba_km_month|euro_number }}</p>
                 </div>
@@ -84,7 +84,8 @@
     <!-- Module Cards Grid -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {% for module in modules %}
-        <div class="module-card p-4 hover:scale-[1.02] transition-transform duration-200">
+        <a href="{% url 'fleet:module_detail' module.module_id %}" class="block">
+        <div class="module-card p-4 hover:scale-[1.02] transition-transform duration-200 cursor-pointer">
             <!-- Card Header -->
             <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center space-x-2">
@@ -118,16 +119,36 @@
                 <!-- KM del Mes -->
                 <div class="flex justify-between items-center">
                     <span class="text-xs text-gray-500 uppercase">
-                        KM Mes{% if module.km_current_month_label %} ({{ module.km_current_month_label }}){% endif %}
+                        KM Mes{% if module.km_current_month_label %} (<span class="font-bold text-gray-700">{{ module.km_current_month_label }}</span>){% endif %}
                     </span>
                     <span class="font-semibold text-gray-900">{{ module.km_current_month|euro_number }}</span>
                 </div>
 
-                <!-- KM Total -->
+                {% if module.fleet_type == 'Toshiba' and module.km_since_rg is not None %}
+                <!-- Toshiba: KM desde RG prominente (ciclo RG = 600.000 km) -->
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div class="text-center">
+                        <span class="text-xs text-yellow-700 uppercase font-medium">KM desde última RG</span>
+                        <p class="text-2xl font-bold mt-1 {% if module.km_since_rg > 500000 %}text-red-600{% elif module.km_since_rg > 400000 %}text-orange-500{% elif module.km_since_rg > 300000 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                            {{ module.km_since_rg|euro_number }}
+                        </p>
+                        <div class="mt-1 text-xs text-gray-500">
+                            Ciclo RG: 600.000 km
+                        </div>
+                    </div>
+                </div>
+                <!-- KM Total (secondary for Toshiba) -->
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-xs text-gray-400 uppercase">KM Total</span>
+                    <span class="text-gray-500">{{ module.km_total_accumulated|euro_number }}</span>
+                </div>
+                {% else %}
+                <!-- CSR / Fallback: KM Total prominente -->
                 <div class="flex justify-between items-center">
                     <span class="text-xs text-gray-500 uppercase">KM Total</span>
                     <span class="font-semibold text-gray-900">{{ module.km_total_accumulated|euro_number }}</span>
                 </div>
+                {% endif %}
 
                 <!-- Divider -->
                 <hr class="border-gray-100">
@@ -155,6 +176,7 @@
                 </div>
             </div>
         </div>
+        </a>
         {% empty %}
         <div class="col-span-full text-center py-12 text-gray-500">
             No se encontraron módulos.

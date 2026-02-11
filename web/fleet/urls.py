@@ -8,4 +8,5 @@ app_name = "fleet"
 
 urlpatterns = [
     path("modules/", views.module_list, name="module_list"),
+    path("modules/<str:module_id>/", views.module_detail, name="module_detail"),
 ]

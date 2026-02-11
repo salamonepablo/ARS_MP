@@ -39,7 +39,7 @@ class MaintenanceEvent:
 class MaintenanceKeyData:
     """Last intervention data for a specific maintenance cycle type.
 
-    Used in the "datos clave para proyección" section of the detail view.
+    Used in the "Detalle Mantenimiento Pesado" section of the detail view.
     """
 
     cycle_type: str  # e.g., "AN", "BA", "PE", "DA", "RB", "RG"
@@ -48,6 +48,8 @@ class MaintenanceKeyData:
     last_date: date | None = None
     km_at_last: int | None = None
     km_since: int | None = None  # km_total - km_at_last
+    # If this cycle's data was inherited from a higher hierarchy cycle
+    inherited_from: str | None = None  # e.g., "RG" if RB inherited from RG
 
 
 @dataclass

@@ -2,14 +2,17 @@
 Fleet module views.
 
 Provides views for displaying fleet module cards, KPIs,
-and detailed module information with maintenance projections.
+detailed module information with maintenance projections,
+and sync controls for the Access-to-Postgres ETL.
 """
 
 import logging
+import subprocess
+import sys
 
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import render
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 
 from core.services.maintenance_projection import (
     MaintenanceProjectionService,
@@ -17,6 +20,10 @@ from core.services.maintenance_projection import (
 from etl.extractors.access_extractor import (
     get_module_detail_from_access,
     get_modules_with_fallback,
+)
+from etl.extractors.postgres_extractor import (
+    get_module_detail_from_postgres,
+    is_postgres_staging_available,
 )
 
 from .stub_data import get_fleet_summary
@@ -46,10 +53,15 @@ def module_list(request):
     elif fleet_filter == "toshiba":
         modules = [m for m in modules if m.fleet_type == "Toshiba"]
 
+    # Sync status for the sync bar
+    from infrastructure.database.models import SyncLog
+    latest_sync = SyncLog.objects.first()  # ordered by -started_at
+
     context = {
         "modules": modules,
         "summary": summary,
         "fleet_filter": fleet_filter,
+        "latest_sync": latest_sync,
     }
 
     return render(request, "fleet/module_list.html", context)
@@ -87,16 +99,30 @@ def module_detail(request, module_id: str):
     # Load detail data on demand if not already populated
     # (Access-sourced modules have module_db_id but empty history/key_data)
     if not module.maintenance_key_data and module.module_db_id is not None:
-        logger.info(
-            "Loading detail data from Access for %s (db_id=%s)",
-            module_id, module.module_db_id,
-        )
-        history, key_data = get_module_detail_from_access(
-            module_db_id=module.module_db_id,
-            module_id=module.module_id,
-            fleet_type=module.fleet_type,
-            km_total=module.km_total_accumulated,
-        )
+        # Prefer Postgres staging; fall back to live ODBC
+        if is_postgres_staging_available():
+            logger.info(
+                "Loading detail data from Postgres for %s (db_id=%s)",
+                module_id, module.module_db_id,
+            )
+            history, key_data = get_module_detail_from_postgres(
+                module_db_id=module.module_db_id,
+                module_id=module.module_id,
+                fleet_type=module.fleet_type,
+                km_total=module.km_total_accumulated,
+                commissioning_date=module.reference_date,
+            )
+        else:
+            logger.info(
+                "Loading detail data from Access for %s (db_id=%s)",
+                module_id, module.module_db_id,
+            )
+            history, key_data = get_module_detail_from_access(
+                module_db_id=module.module_db_id,
+                module_id=module.module_id,
+                fleet_type=module.fleet_type,
+                km_total=module.km_total_accumulated,
+            )
         module.maintenance_history = history
         module.maintenance_key_data = key_data
 
@@ -125,8 +151,10 @@ def module_detail(request, module_id: str):
     ]
 
     # Determine data source for display
-    # If module_db_id is set, data comes from Access; otherwise from stub
-    data_source = "ACCESS" if module.module_db_id is not None else "STUB"
+    if module.module_db_id is not None:
+        data_source = "POSTGRES" if is_postgres_staging_available() else "ACCESS"
+    else:
+        data_source = "STUB"
 
     context = {
         "module": module,
@@ -137,3 +165,87 @@ def module_detail(request, module_id: str):
     }
 
     return render(request, "fleet/module_detail.html", context)
+
+
+# ---------------------------------------------------------------------------
+# Sync Access → Postgres
+# ---------------------------------------------------------------------------
+
+@require_GET
+def sync_status(request):
+    """
+    Return JSON with the latest sync status for Alpine.js polling.
+
+    URL: /fleet/sync/status/
+    """
+    from infrastructure.database.models import SyncLog
+
+    latest = SyncLog.objects.first()  # ordered by -started_at
+    if latest is None:
+        return JsonResponse({
+            "has_synced": False,
+            "status": "never",
+            "started_at": None,
+            "finished_at": None,
+            "duration": None,
+            "tables": {},
+            "error": "",
+        })
+
+    return JsonResponse({
+        "has_synced": True,
+        "status": latest.status,
+        "started_at": latest.started_at.isoformat() if latest.started_at else None,
+        "finished_at": latest.finished_at.isoformat() if latest.finished_at else None,
+        "duration": latest.duration_seconds,
+        "tables": latest.tables_synced or {},
+        "error": latest.error_message or "",
+    })
+
+
+@require_POST
+def sync_trigger(request):
+    """
+    Launch ``sync_access`` as a detached subprocess and return immediately.
+
+    The subprocess writes its progress into a ``SyncLog`` row that the
+    frontend polls via ``/fleet/sync/status/``.
+
+    URL: POST /fleet/sync/trigger/
+    """
+    from infrastructure.database.models import SyncLog
+
+    # Prevent concurrent syncs
+    running = SyncLog.objects.filter(status="running").exists()
+    if running:
+        return JsonResponse(
+            {"ok": False, "error": "Ya hay una sincronización en curso."},
+            status=409,
+        )
+
+    # Launch sync_access as a detached subprocess
+    python_exe = sys.executable  # same interpreter running Django
+    cmd = [python_exe, "manage.py", "sync_access"]
+
+    logger.info("Launching sync_access subprocess: %s", " ".join(cmd))
+
+    try:
+        subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            # On Windows, CREATE_NO_WINDOW prevents a console flash
+            creationflags=(
+                subprocess.CREATE_NO_WINDOW
+                if sys.platform == "win32"
+                else 0
+            ),
+        )
+    except Exception as e:
+        logger.exception("Failed to launch sync_access subprocess")
+        return JsonResponse(
+            {"ok": False, "error": f"Error al lanzar sync: {e}"},
+            status=500,
+        )
+
+    return JsonResponse({"ok": True})

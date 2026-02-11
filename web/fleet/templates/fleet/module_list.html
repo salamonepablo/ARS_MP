@@ -81,6 +81,67 @@
         </a>
     </div>
 
+    <!-- Sync Status Bar -->
+    <div x-data="syncBar()" x-init="init()" class="mb-6">
+        <div class="flex items-center justify-between text-xs text-gray-400 px-1">
+            <div class="flex items-center space-x-2">
+                <!-- Status indicator -->
+                <template x-if="status === 'running'">
+                    <span class="flex items-center space-x-1 text-amber-500">
+                        <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <span>Sincronizando con Access...</span>
+                    </span>
+                </template>
+                <template x-if="status === 'success'">
+                    <span class="flex items-center space-x-1">
+                        <span class="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+                        <span>Datos: PostgreSQL</span>
+                    </span>
+                </template>
+                <template x-if="status === 'failed'">
+                    <span class="flex items-center space-x-1 text-red-400">
+                        <span class="w-1.5 h-1.5 bg-red-400 rounded-full"></span>
+                        <span>Ultimo sync fallido</span>
+                    </span>
+                </template>
+                <template x-if="status === 'never'">
+                    <span class="flex items-center space-x-1">
+                        <span class="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
+                        <span>Sin sincronizar</span>
+                    </span>
+                </template>
+
+                <!-- Last sync time -->
+                <template x-if="lastSync">
+                    <span class="text-gray-300">|</span>
+                </template>
+                <template x-if="lastSync">
+                    <span x-text="'Ultimo sync: ' + lastSync"></span>
+                </template>
+                <template x-if="duration !== null && status !== 'running'">
+                    <span x-text="'(' + duration.toFixed(0) + 's)'"></span>
+                </template>
+            </div>
+
+            <!-- Sync button -->
+            <button
+                @click="triggerSync()"
+                :disabled="status === 'running'"
+                class="flex items-center space-x-1 px-2 py-1 rounded text-xs transition-colors
+                       hover:bg-gray-100 hover:text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                :title="status === 'running' ? 'Sincronizacion en curso' : 'Sincronizar con Access'"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" :class="{'animate-spin': status === 'running'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span x-text="status === 'running' ? 'Sincronizando...' : 'Sync Access'"></span>
+            </button>
+        </div>
+    </div>
+
     <!-- Module Cards Grid -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {% for module in modules %}
@@ -124,31 +185,20 @@
                     <span class="font-semibold text-gray-900">{{ module.km_current_month|euro_number }}</span>
                 </div>
 
-                {% if module.fleet_type == 'Toshiba' and module.km_since_rg is not None %}
-                <!-- Toshiba: KM desde RG prominente (ciclo RG = 600.000 km) -->
-                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <div class="text-center">
-                        <span class="text-xs text-yellow-700 uppercase font-medium">KM desde última RG</span>
-                        <p class="text-2xl font-bold mt-1 {% if module.km_since_rg > 500000 %}text-red-600{% elif module.km_since_rg > 400000 %}text-orange-500{% elif module.km_since_rg > 300000 %}text-yellow-600{% else %}text-green-600{% endif %}">
-                            {{ module.km_since_rg|euro_number }}
-                        </p>
-                        <div class="mt-1 text-xs text-gray-500">
-                            Ciclo RG: 600.000 km
-                        </div>
-                    </div>
+                {% if module.km_since_rg is not None %}
+                <!-- KM desde RG/DA en una línea (Toshiba: RG, CSR: DA) -->
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-gray-500 uppercase">KM {% if module.fleet_type == 'Toshiba' %}RG{% else %}DA{% endif %}</span>
+                    <span class="font-semibold {% if module.km_since_rg > 500000 %}text-red-600{% elif module.km_since_rg > 400000 %}text-orange-500{% elif module.km_since_rg > 300000 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                        {{ module.km_since_rg|euro_number }}
+                    </span>
                 </div>
-                <!-- KM Total (secondary for Toshiba) -->
-                <div class="flex justify-between items-center text-sm">
-                    <span class="text-xs text-gray-400 uppercase">KM Total</span>
-                    <span class="text-gray-500">{{ module.km_total_accumulated|euro_number }}</span>
-                </div>
-                {% else %}
-                <!-- CSR / Fallback: KM Total prominente -->
+                {% endif %}
+                <!-- KM Total -->
                 <div class="flex justify-between items-center">
                     <span class="text-xs text-gray-500 uppercase">KM Total</span>
                     <span class="font-semibold text-gray-900">{{ module.km_total_accumulated|euro_number }}</span>
                 </div>
-                {% endif %}
 
                 <!-- Divider -->
                 <hr class="border-gray-100">
@@ -184,4 +234,89 @@
         {% endfor %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function syncBar() {
+    return {
+        status: 'never',
+        lastSync: null,
+        duration: null,
+        pollInterval: null,
+
+        init() {
+            this.fetchStatus();
+        },
+
+        async fetchStatus() {
+            try {
+                const response = await fetch('/fleet/sync/status/');
+                const data = await response.json();
+                
+                if (!data.has_synced) {
+                    this.status = 'never';
+                    this.lastSync = null;
+                    this.duration = null;
+                } else {
+                    this.status = data.status;
+                    this.duration = data.duration;
+                    
+                    if (data.finished_at) {
+                        const dt = new Date(data.finished_at);
+                        this.lastSync = dt.toLocaleDateString('es-AR') + ' ' + dt.toLocaleTimeString('es-AR', {hour: '2-digit', minute: '2-digit'});
+                    } else if (data.started_at) {
+                        const dt = new Date(data.started_at);
+                        this.lastSync = dt.toLocaleDateString('es-AR') + ' ' + dt.toLocaleTimeString('es-AR', {hour: '2-digit', minute: '2-digit'});
+                    }
+                }
+
+                // If running, poll every 2 seconds
+                if (this.status === 'running') {
+                    if (!this.pollInterval) {
+                        this.pollInterval = setInterval(() => this.fetchStatus(), 2000);
+                    }
+                } else {
+                    if (this.pollInterval) {
+                        clearInterval(this.pollInterval);
+                        this.pollInterval = null;
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching sync status:', error);
+            }
+        },
+
+        async triggerSync() {
+            if (this.status === 'running') return;
+            
+            this.status = 'running';
+            this.lastSync = null;
+            
+            try {
+                const response = await fetch('/fleet/sync/trigger/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                if (response.ok) {
+                    // Start polling for status
+                    this.pollInterval = setInterval(() => this.fetchStatus(), 2000);
+                } else {
+                    const data = await response.json();
+                    console.error('Sync trigger failed:', data.error);
+                    this.status = 'failed';
+                }
+            } catch (error) {
+                console.error('Error triggering sync:', error);
+                this.status = 'failed';
+            }
+        }
+    };
+}
+</script>
+{% csrf_token %}
 {% endblock %}

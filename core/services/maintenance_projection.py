@@ -19,7 +19,13 @@ from typing import Literal
 # Constants: maintenance cycle definitions
 # ---------------------------------------------------------------------------
 
+# Cycles ordered by hierarchy (lowest to highest)
+# Higher hierarchy interventions "reset" lower ones when performed
+
+# ALL cycles (used for projection calculations)
 CSR_MAINTENANCE_CYCLES: list[tuple[str, str, int]] = [
+    ("IQ", "Quincenal (IQ)", 6_250),
+    ("IB", "Bimestral (IB)", 25_000),
     ("AN", "Anual (AN)", 187_500),
     ("BA", "Bianual (BA)", 375_000),
     ("PE", "Pentanual (PE)", 750_000),
@@ -27,9 +33,40 @@ CSR_MAINTENANCE_CYCLES: list[tuple[str, str, int]] = [
 ]
 
 TOSHIBA_MAINTENANCE_CYCLES: list[tuple[str, str, int]] = [
+    ("MEN", "Mensual (MEN)", 30_000),
     ("RB", "Bienal (RB)", 300_000),
     ("RG", "Reparación General (RG)", 600_000),
 ]
+
+# HEAVY cycles only (displayed in "Detalle Mantenimiento Pesado" table)
+CSR_HEAVY_CYCLES: list[tuple[str, str, int]] = [
+    ("AN", "Anual (AN)", 187_500),
+    ("BA", "Bianual (BA)", 375_000),
+    ("PE", "Pentanual (PE)", 750_000),
+    ("DA", "Decanual (DA)", 1_500_000),
+]
+
+TOSHIBA_HEAVY_CYCLES: list[tuple[str, str, int]] = [
+    ("RB", "Bienal (RB)", 300_000),
+    ("RG", "Reparación General (RG)", 600_000),
+]
+
+# Hierarchy levels: higher number = higher hierarchy (resets lower ones)
+# When a cycle is performed, all cycles with LOWER hierarchy inherit its date/km
+CSR_HIERARCHY: dict[str, int] = {
+    "IQ": 1,
+    "IB": 2,
+    "AN": 3,
+    "BA": 4,
+    "PE": 5,
+    "DA": 6,
+}
+
+TOSHIBA_HIERARCHY: dict[str, int] = {
+    "MEN": 1,
+    "RB": 2,
+    "RG": 3,
+}
 
 # Average daily km by fleet (from business spec)
 AVG_DAILY_KM: dict[str, int] = {
@@ -199,6 +236,11 @@ class MaintenanceHistoryService:
     ) -> list[dict]:
         """Extract the last intervention for each maintenance cycle type.
 
+        Applies hierarchy inheritance: when a higher-level intervention is
+        performed, it "resets" all lower-level cycles. For example, if an RG
+        (Toshiba) is done on 14/10/2025, both RB and MEN inherit that date
+        and km as their new baseline.
+
         Args:
             fleet_type: "CSR" or "Toshiba".
             history: List of dicts with keys:
@@ -211,19 +253,25 @@ class MaintenanceHistoryService:
             List of dicts with keys:
                 - cycle_type, cycle_label, cycle_km
                 - last_date, km_at_last, km_since
+                - inherited_from (str | None) - if inherited from higher cycle
             One entry per cycle type, ordered by cycle_km ascending.
         """
         if fleet_type == "CSR":
             cycles = CSR_MAINTENANCE_CYCLES
+            hierarchy = CSR_HIERARCHY
         else:
             cycles = TOSHIBA_MAINTENANCE_CYCLES
+            hierarchy = TOSHIBA_HIERARCHY
 
-        # Find latest event for each cycle type
+        # Step 1: Find latest event for each cycle type from raw history
         latest_by_cycle: dict[str, dict] = {}
         for event in history:
             task = event.get("task_type", "")
             cycle = TASK_TO_CYCLE.get(task)
             if cycle is None:
+                continue
+            # Only consider cycles relevant to this fleet
+            if cycle not in hierarchy:
                 continue
 
             event_date = event.get("event_date")
@@ -233,6 +281,7 @@ class MaintenanceHistoryService:
                 latest_by_cycle[cycle] = {
                     "last_date": event_date,
                     "km_at_last": km_at,
+                    "inherited_from": None,
                 }
             else:
                 existing = latest_by_cycle[cycle]
@@ -240,8 +289,37 @@ class MaintenanceHistoryService:
                     latest_by_cycle[cycle] = {
                         "last_date": event_date,
                         "km_at_last": km_at,
+                        "inherited_from": None,
                     }
 
+        # Step 2: Apply hierarchy inheritance (higher cycles reset lower ones)
+        # For each cycle, check if a higher-hierarchy cycle has a MORE RECENT date
+        for cycle_type in hierarchy:
+            current = latest_by_cycle.get(cycle_type)
+            current_date = current["last_date"] if current else None
+            current_hierarchy = hierarchy[cycle_type]
+
+            # Check all cycles with HIGHER hierarchy
+            for other_cycle, other_hierarchy in hierarchy.items():
+                if other_hierarchy <= current_hierarchy:
+                    continue  # Only check higher hierarchy cycles
+
+                other = latest_by_cycle.get(other_cycle)
+                if not other or not other["last_date"]:
+                    continue
+
+                other_date = other["last_date"]
+
+                # If higher cycle is more recent, it resets this cycle
+                if current_date is None or other_date > current_date:
+                    latest_by_cycle[cycle_type] = {
+                        "last_date": other_date,
+                        "km_at_last": other["km_at_last"],
+                        "inherited_from": other_cycle,
+                    }
+                    current_date = other_date  # Update for next comparison
+
+        # Step 3: Build result list
         result = []
         for cycle_type, cycle_label, cycle_km in cycles:
             entry = latest_by_cycle.get(cycle_type, {})
@@ -255,6 +333,7 @@ class MaintenanceHistoryService:
                 "last_date": entry.get("last_date"),
                 "km_at_last": km_at_last,
                 "km_since": km_since,
+                "inherited_from": entry.get("inherited_from"),
             })
 
         return result

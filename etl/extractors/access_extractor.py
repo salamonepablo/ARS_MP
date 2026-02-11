@@ -1071,6 +1071,25 @@ def get_module_detail_from_access(
             history_rows = cursor.fetchall()
             has_extra_fields = False
 
+        logger.info(
+            "Module %s (db_id=%s): history query returned %d rows "
+            "(extra_fields=%s, cutoff=%s, ref_date=%s)",
+            module_id, module_db_id, len(history_rows),
+            has_extra_fields, cutoff_date, reference_date,
+        )
+        if history_rows and has_extra_fields:
+            sample = history_rows[0]
+            logger.debug(
+                "Module %s history sample row: Tarea=%s, Fecha_Fin=%s, "
+                "Fecha_Inicio=%s, OT_SIMAF=%r, Km=%s",
+                module_id,
+                getattr(sample, "Tarea", "?"),
+                getattr(sample, "Fecha_Fin", "?"),
+                getattr(sample, "Fecha_Inicio", "?"),
+                getattr(sample, "OT_SIMAF", "?"),
+                getattr(sample, "Km", "?"),
+            )
+
         for row in history_rows:
             event_date = _parse_date(row.Fecha_Fin)
             if event_date is None:
@@ -1094,13 +1113,23 @@ def get_module_detail_from_access(
                 duration_days=duration_days,
             ))
 
+        logger.info(
+            "Module %s: built %d MaintenanceEvent objects from history rows.",
+            module_id, len(history),
+        )
+
         # 2. Fetch last intervention per cycle type
         logger.info(f"Fetching key cycle data for module {module_db_id}...")
         cursor.execute(SQL_GET_MAINTENANCE_TASKS_FOR_MODULE, (module_db_id,))
 
         # Build lookup: task -> (date, km)
+        task_rows = cursor.fetchall()
+        logger.info(
+            "Module %s (db_id=%s): maintenance tasks query returned %d rows.",
+            module_id, module_db_id, len(task_rows),
+        )
         latest_by_task: dict[str, tuple[date | None, int]] = {}
-        for row in cursor.fetchall():
+        for row in task_rows:
             task = _normalize_task_code(row.Tarea)
             if not task:
                 continue
@@ -1149,6 +1178,13 @@ def get_module_detail_from_access(
                 km_since=km_since,
             ))
 
+        logger.info(
+            "Module %s: tasks by code: %s | cycles found: %s | key_data entries: %d",
+            module_id,
+            {t: (str(d), km) for t, (d, km) in sorted(latest_by_task.items())},
+            list(latest_by_cycle.keys()),
+            len(key_data),
+        )
         return history, key_data
 
     except Exception as e:
@@ -1160,28 +1196,42 @@ def get_module_detail_from_access(
 
 def get_modules_with_fallback() -> list[ModuleData]:
     """
-    Get modules from Access database, falling back to stub data if unavailable.
-    
-    This is the main entry point for the web views. It provides graceful
-    degradation when the Access database is not available (e.g., in CI,
-    development without database, missing driver).
-    
+    Get modules with a 3-tier fallback strategy.
+
+    Priority:
+    1. **Postgres staging** — fastest, no ODBC needed at request time.
+       Used when ``stg_modulo`` has data (i.e. ``sync_access`` has been run).
+    2. **Live ODBC to Access** — if staging is empty but Access is available.
+    3. **Stub data** — development/CI fallback.
+
     Returns:
-        List of ModuleData objects (from Access or stub data)
+        List of ModuleData objects and the source label is logged.
     """
-    if not is_access_available():
-        logger.warning(
-            "Access database not available. Using stub data as fallback. "
-            "Set LEGACY_ACCESS_DB_PATH and LEGACY_ACCESS_DB_PASSWORD in .env "
-            "to connect to the real database."
-        )
-        return get_all_modules()
-    
+    # --- Tier 1: Postgres staging ---
     try:
-        return get_modules_from_access()
-    except AccessConnectionError as e:
-        logger.warning(f"Failed to connect to Access database: {e}. Using stub data.")
-        return get_all_modules()
+        from etl.extractors.postgres_extractor import (
+            get_modules_from_postgres,
+            is_postgres_staging_available,
+        )
+        if is_postgres_staging_available():
+            logger.info("Data source: Postgres staging tables")
+            return get_modules_from_postgres()
     except Exception as e:
-        logger.error(f"Unexpected error extracting from Access: {e}. Using stub data.")
-        return get_all_modules()
+        logger.warning("Postgres staging read failed: %s. Trying Access ODBC.", e)
+
+    # --- Tier 2: Live ODBC to Access ---
+    if is_access_available():
+        try:
+            logger.info("Data source: Access ODBC (live)")
+            return get_modules_from_access()
+        except AccessConnectionError as e:
+            logger.warning("Failed to connect to Access database: %s. Using stub data.", e)
+        except Exception as e:
+            logger.error("Unexpected error extracting from Access: %s. Using stub data.", e)
+
+    # --- Tier 3: Stub data ---
+    logger.warning(
+        "No data source available (Postgres empty, Access unavailable). "
+        "Using stub data as fallback."
+    )
+    return get_all_modules()

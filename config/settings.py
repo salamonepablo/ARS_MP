@@ -169,3 +169,42 @@ STATICFILES_DIRS = [
 # =============================================================================
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# =============================================================================
+# Logging
+# =============================================================================
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{asctime}] {levelname} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "loggers": {
+        "etl": {
+            "handlers": ["console"],
+            "level": os.getenv("ETL_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+        "core": {
+            "handlers": ["console"],
+            "level": os.getenv("CORE_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+        "web": {
+            "handlers": ["console"],
+            "level": os.getenv("WEB_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+    },
+}

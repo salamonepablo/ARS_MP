@@ -35,3 +35,31 @@ def euro_number(value):
         return f"{num:,}".replace(",", ".")
     except (ValueError, TypeError):
         return str(value)
+
+
+@register.filter
+def divide(value, divisor):
+    """
+    Divide a number by a divisor.
+    
+    Examples:
+        12000|divide:30 -> 400
+    
+    Args:
+        value: Number to divide
+        divisor: Number to divide by
+        
+    Returns:
+        Integer result of division, or 0 if invalid
+    """
+    if value is None or divisor is None:
+        return 0
+    
+    try:
+        num = int(value)
+        div = int(divisor)
+        if div == 0:
+            return 0
+        return num // div
+    except (ValueError, TypeError):
+        return 0

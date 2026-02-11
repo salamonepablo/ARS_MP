@@ -70,19 +70,21 @@
 </head>
 <body class="min-h-screen bg-ta-50">
     <!-- Navigation -->
-    <nav class="bg-ta-500 shadow-lg">
+    <nav class="bg-white shadow-lg border-b-4 border-ta-500">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <a href="/" class="flex items-center space-x-2">
-                        <span class="text-2xl">🚆</span>
-                        <span class="font-bold text-xl text-white">ARS_MP</span>
+                    <a href="/" class="flex items-center space-x-3">
+                        <img src="{% static 'images/LogoTAO.jpg' %}" alt="Trenes Argentinos" class="h-10">
+                        <div class="border-l-2 border-ta-300 pl-3">
+                            <span class="font-semibold text-lg text-ta-700">Maintenance Planner</span>
+                            <span class="block text-xs text-ta-400">Linea Roca</span>
+                        </div>
                     </a>
-                    <span class="ml-4 text-sm text-ta-100">Linea Roca</span>
                 </div>
                 <div class="flex items-center space-x-4">
                     <a href="{% url 'fleet:module_list' %}" 
-                       class="text-ta-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                       class="text-ta-600 hover:text-ta-800 hover:bg-ta-50 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                         Flota
                     </a>
                 </div>
@@ -99,7 +101,7 @@
     <footer class="bg-ta-700 mt-auto">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <p class="text-center text-sm text-ta-100">
-                ARS_MP - Argentinian Rolling Stock Maintenance Planner | Linea Roca
+                Trenes Argentinos - Maintenance Planner | Linea Roca
             </p>
         </div>
     </footer>

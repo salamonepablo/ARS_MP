@@ -425,15 +425,21 @@ def get_fleet_summary(modules: list[ModuleData]) -> dict:
             month_label = module.km_current_month_label
             break
 
+    total_km_month = sum(m.km_current_month for m in modules)
+    
+    # Calculate average km per day (assuming 30-day month)
+    avg_km_day = total_km_month // 30 if total_km_month > 0 else 0
+
     return {
         "csr_count": len(csr_modules),
         "toshiba_count": len(toshiba_modules),
         "total_count": len(modules),
         "csr_km_month": sum(m.km_current_month for m in csr_modules),
         "toshiba_km_month": sum(m.km_current_month for m in toshiba_modules),
-        "total_km_month": sum(m.km_current_month for m in modules),
+        "total_km_month": total_km_month,
         "csr_km_total": sum(m.km_total_accumulated for m in csr_modules),
         "toshiba_km_total": sum(m.km_total_accumulated for m in toshiba_modules),
         "total_km_total": sum(m.km_total_accumulated for m in modules),
         "km_month_label": month_label,
+        "avg_km_day": avg_km_day,
     }

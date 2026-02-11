@@ -530,6 +530,21 @@ def get_module_detail_from_postgres(
                     "inherited_from": None,
                 }
 
+    # Apply commissioning_date as fallback for top-level cycle BEFORE inheritance
+    # This ensures DA/RG gets the puesta en servicio date, which then propagates
+    # to lower cycles (PE, BA, AN for CSR; RB, MEN for Toshiba) via inheritance.
+    top_cycle = "DA" if fleet_type == "CSR" else "RG"
+    if top_cycle not in latest_by_cycle and commissioning_date:
+        latest_by_cycle[top_cycle] = {
+            "last_date": commissioning_date,
+            "km_at_last": 0,
+            "inherited_from": "Puesta en Servicio",
+        }
+        logger.info(
+            "Module %s: using commissioning_date %s as fallback for %s",
+            module_id, commissioning_date, top_cycle,
+        )
+
     # Apply hierarchy inheritance: higher cycles reset lower ones
     # For each cycle, check if a higher-hierarchy cycle has a MORE RECENT date
     for cycle_type in hierarchy:
@@ -559,23 +574,14 @@ def get_module_detail_from_postgres(
 
     # Build key_data list using ALL cycles (needed for projection)
     # The template will filter to show only heavy cycles in the display table
-    
-    # Determine the top-level cycle that uses commissioning_date as fallback
-    # CSR: DA (Decanual), Toshiba: RG (Reparación General)
-    top_cycle = "DA" if fleet_type == "CSR" else "RG"
+    # NOTE: commissioning_date fallback for top_cycle is already applied above,
+    # before inheritance, so it propagates correctly to lower cycles.
     
     for cycle_type, cycle_label, cycle_km in all_cycles:
         entry = latest_by_cycle.get(cycle_type, {})
         last_date = entry.get("last_date")
         km_at_last = entry.get("km_at_last")
         inherited_from = entry.get("inherited_from")
-
-        # For the top-level cycle (DA/RG), use commissioning_date as fallback
-        # when no intervention has been recorded
-        if cycle_type == top_cycle and last_date is None and commissioning_date:
-            last_date = commissioning_date
-            km_at_last = 0
-            inherited_from = "Puesta en Servicio"
 
         if km_at_last is not None:
             km_since = max(0, km_total - km_at_last)

@@ -335,10 +335,29 @@ def load_rg_dates_from_csv() -> dict[str, tuple[date, str]]:
         return rg_dates
     
     try:
-        with open(URG_MODULOS_CSV_PATH, encoding="utf-8") as f:
+        # Use utf-8-sig to handle BOM (Byte Order Mark) in CSV files
+        with open(URG_MODULOS_CSV_PATH, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f, delimiter=";")
+            
+            # Normalize fieldnames to handle encoding variations
+            # The first column may contain BOM or encoding issues with "Módulo"
+            fieldnames = reader.fieldnames or []
+            modulo_field = None
+            for fn in fieldnames:
+                # Match any variation of "Módulo" (with accents, BOM, etc.)
+                if "dulo" in fn.lower() or "modulo" in fn.lower():
+                    modulo_field = fn
+                    break
+            
+            if modulo_field is None:
+                logger.warning(
+                    "Could not find 'Módulo' column in URG-Modulos.csv. "
+                    f"Available columns: {fieldnames}"
+                )
+                return rg_dates
+            
             for row in reader:
-                modulo_raw = row.get("Módulo", "").strip()
+                modulo_raw = row.get(modulo_field, "").strip()
                 manufacturer = row.get("Manufacturer", "").strip()
                 tipo = row.get("Tipo", "").strip()
                 fecha_str = row.get("Fecha", "").strip()

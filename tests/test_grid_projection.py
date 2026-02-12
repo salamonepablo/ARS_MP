@@ -255,3 +255,102 @@ class TestGenerateGrid:
             reference_date=date(2026, 2, 1),
         )
         assert result == []
+
+
+class TestCycleRowLastDate:
+    """Test that last_date is propagated to CycleRow."""
+
+    def test_last_date_populated_from_key_data(self):
+        """When key_data includes last_date, CycleRow should store it."""
+        key_data = [
+            {
+                "cycle_type": "AN",
+                "cycle_km": 187_500,
+                "km_since": 50_000,
+                "last_date": date(2024, 6, 15),
+            },
+            {
+                "cycle_type": "BA",
+                "cycle_km": 375_000,
+                "km_since": 100_000,
+                "last_date": date(2023, 3, 10),
+            },
+            {
+                "cycle_type": "PE",
+                "cycle_km": 750_000,
+                "km_since": 200_000,
+                "last_date": date(2021, 12, 1),
+            },
+            {
+                "cycle_type": "DA",
+                "cycle_km": 1_500_000,
+                "km_since": 300_000,
+                "last_date": date(2018, 8, 20),
+            },
+        ]
+        result = GridProjectionService.project_module(
+            module_id="M01",
+            fleet_type="CSR",
+            key_data=key_data,
+            avg_monthly_km=12_000,
+            months=3,
+            reference_date=date(2026, 2, 1),
+        )
+        # DA is first (highest hierarchy)
+        assert result.cycle_rows[0].last_date == date(2018, 8, 20)
+        # AN is last (lowest heavy hierarchy)
+        assert result.cycle_rows[-1].last_date == date(2024, 6, 15)
+
+    def test_last_date_none_when_not_provided(self):
+        """When key_data omits last_date, CycleRow.last_date should be None."""
+        key_data = [
+            {"cycle_type": "AN", "cycle_km": 187_500, "km_since": 50_000},
+            {"cycle_type": "BA", "cycle_km": 375_000, "km_since": 100_000},
+            {"cycle_type": "PE", "cycle_km": 750_000, "km_since": 200_000},
+            {"cycle_type": "DA", "cycle_km": 1_500_000, "km_since": 300_000},
+        ]
+        result = GridProjectionService.project_module(
+            module_id="M01",
+            fleet_type="CSR",
+            key_data=key_data,
+            avg_monthly_km=12_000,
+            months=3,
+            reference_date=date(2026, 2, 1),
+        )
+        for row in result.cycle_rows:
+            assert row.last_date is None
+
+    def test_last_date_mixed_some_provided(self):
+        """last_date should be correct even when only some cycles have it."""
+        key_data = [
+            {
+                "cycle_type": "AN",
+                "cycle_km": 187_500,
+                "km_since": 50_000,
+                "last_date": date(2024, 6, 15),
+            },
+            {"cycle_type": "BA", "cycle_km": 375_000, "km_since": 100_000},
+            {
+                "cycle_type": "PE",
+                "cycle_km": 750_000,
+                "km_since": 200_000,
+                "last_date": date(2021, 12, 1),
+            },
+            {"cycle_type": "DA", "cycle_km": 1_500_000, "km_since": 300_000},
+        ]
+        result = GridProjectionService.project_module(
+            module_id="M01",
+            fleet_type="CSR",
+            key_data=key_data,
+            avg_monthly_km=12_000,
+            months=3,
+            reference_date=date(2026, 2, 1),
+        )
+        # DA (index 0) has no last_date
+        assert result.cycle_rows[0].last_date is None
+        # PE (index 1) has last_date
+        assert result.cycle_rows[1].last_date == date(2021, 12, 1)
+        # BA (index 2) has no last_date
+        assert result.cycle_rows[2].last_date is None
+        # AN (index 3) has last_date
+        assert result.cycle_rows[3].last_date == date(2024, 6, 15)

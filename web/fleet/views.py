@@ -14,6 +14,8 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
 
+import json
+
 from core.services.grid_projection import (
     CYCLE_COLORS,
     DEFAULT_AVG_MONTHLY_KM,
@@ -22,8 +24,10 @@ from core.services.grid_projection import (
 )
 from core.services.maintenance_projection import (
     CSR_HEAVY_CYCLES,
+    CSR_HIERARCHY,
     MaintenanceProjectionService,
     TOSHIBA_HEAVY_CYCLES,
+    TOSHIBA_HIERARCHY,
 )
 from etl.extractors.access_extractor import (
     get_module_detail_from_access,
@@ -324,6 +328,7 @@ def projection_grid(request):
                 "cycle_type": kd.cycle_type,
                 "cycle_km": kd.cycle_km,
                 "km_since": kd.km_since,
+                "last_date": kd.last_date,
             }
             for kd in mod.maintenance_key_data
         ]
@@ -346,6 +351,20 @@ def projection_grid(request):
         reference_date=today,
     )
 
+    # Build summary cycle descriptors for the footer rows
+    if fleet_type == "CSR":
+        summary_cycles = [
+            {"cycle_type": "DA", "color_bg": "bg-red-100", "color_text": "text-red-800"},
+            {"cycle_type": "PE", "color_bg": "bg-sky-100", "color_text": "text-sky-800"},
+            {"cycle_type": "BA", "color_bg": "bg-yellow-100", "color_text": "text-yellow-800"},
+            {"cycle_type": "AN", "color_bg": "bg-green-100", "color_text": "text-green-800"},
+        ]
+    else:
+        summary_cycles = [
+            {"cycle_type": "RG", "color_bg": "bg-red-100", "color_text": "text-red-800"},
+            {"cycle_type": "RB", "color_bg": "bg-yellow-100", "color_text": "text-yellow-800"},
+        ]
+
     context = {
         "grid": grid,
         "month_headers": month_headers,
@@ -355,6 +374,7 @@ def projection_grid(request):
         "avg_km": avg_km,
         "avg_km_csr": DEFAULT_AVG_MONTHLY_KM["CSR"],
         "avg_km_toshiba": DEFAULT_AVG_MONTHLY_KM["Toshiba"],
+        "summary_cycles": summary_cycles,
     }
 
     return render(request, "fleet/projection_grid.html", context)
@@ -417,6 +437,7 @@ def projection_export(request):
                 "cycle_type": kd.cycle_type,
                 "cycle_km": kd.cycle_km,
                 "km_since": kd.km_since,
+                "last_date": kd.last_date,
             }
             for kd in mod.maintenance_key_data
         ]
@@ -435,6 +456,24 @@ def projection_export(request):
     month_headers = GridProjectionService.get_month_headers(
         months=months, reference_date=today,
     )
+
+    # --- Parse user interventions from JS (if any) ---
+    # Format: JSON array of keys like ["M03-DA-5", "M01-BA-10"]
+    interventions_raw = request.GET.get("interventions", "")
+    intervention_set: set[tuple[str, str, int]] = set()
+    if interventions_raw:
+        try:
+            keys = json.loads(interventions_raw)
+            for key in keys:
+                parts = key.rsplit("-", 2)
+                if len(parts) == 3:
+                    mod_id, cycle, m_idx = parts[0], parts[1], int(parts[2])
+                    intervention_set.add((mod_id, cycle, m_idx))
+        except (json.JSONDecodeError, ValueError):
+            pass  # Ignore malformed data, export without interventions
+
+    # Build hierarchy lookup for intervention cascade
+    hierarchy_order = CSR_HIERARCHY if fleet_type == "CSR" else TOSHIBA_HIERARCHY
 
     # --- Build Excel workbook ---
     # Colour mapping: Tailwind class -> openpyxl hex (no leading #)
@@ -459,10 +498,10 @@ def projection_export(request):
     ws = wb.active
     ws.title = f"Proyeccion {fleet_type}"
 
-    # Header row
+    # Header row  (columns: Modulo | Fecha | Ciclo | Umbral | months...)
     header_font = Font(bold=True, size=10)
     header_fill = PatternFill("solid", fgColor="F3F4F6")  # gray-100
-    headers = ["Modulo", "Ciclo", "Umbral"] + month_headers
+    headers = ["Modulo", "Fecha", "Ciclo", "Umbral"] + month_headers
 
     for col_idx, h in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_idx, value=h)
@@ -474,6 +513,30 @@ def projection_export(request):
     current_row = 2
     right_align = Alignment(horizontal="right")
     center_align = Alignment(horizontal="center")
+    date_format = "DD/MM/YYYY"
+
+    # Pre-compute intervention resets per module:
+    # For each module, find all interventions and determine which rows/months
+    # need km recalculated (same row + heir rows from intervention onward).
+    # Structure: { (module_id, cycle_type): reset_from_month_idx }
+    # A reset means km accumulates from 0 starting at that month.
+    reset_map: dict[tuple[str, str], int] = {}
+
+    if intervention_set:
+        for mod_id, cycle, m_idx in intervention_set:
+            # Direct intervention: reset this row from m_idx
+            key = (mod_id, cycle)
+            # Keep the earliest intervention if multiple on same row
+            if key not in reset_map or m_idx < reset_map[key]:
+                reset_map[key] = m_idx
+
+            # Cascade: reset all lower-hierarchy cycles from m_idx
+            cycle_level = hierarchy_order.get(cycle, 0)
+            for heir_cycle, heir_level in hierarchy_order.items():
+                if heir_level < cycle_level:
+                    heir_key = (mod_id, heir_cycle)
+                    if heir_key not in reset_map or m_idx < reset_map[heir_key]:
+                        reset_map[heir_key] = m_idx
 
     for module in grid:
         for row_idx, cycle_row in enumerate(module.cycle_rows):
@@ -495,47 +558,158 @@ def projection_export(request):
                         horizontal="center", vertical="center",
                     )
 
+            # Last intervention date
+            date_cell = ws.cell(
+                row=current_row, column=2,
+                value=cycle_row.last_date,
+            )
+            date_cell.alignment = center_align
+            if cycle_row.last_date:
+                date_cell.number_format = date_format
+
             # Cycle type
             ws.cell(
-                row=current_row, column=2,
+                row=current_row, column=3,
                 value=cycle_row.cycle_type,
             ).alignment = center_align
 
             # Threshold
             ws.cell(
-                row=current_row, column=3,
+                row=current_row, column=4,
                 value=cycle_row.cycle_km,
             ).alignment = right_align
-            ws.cell(row=current_row, column=3).number_format = "#,##0"
+            ws.cell(row=current_row, column=4).number_format = "#,##0"
 
-            # Month cells
+            # Determine if this row has a reset point
+            reset_key = (module.module_id, cycle_row.cycle_type)
+            reset_from = reset_map.get(reset_key)
+
+            # Month cells (start at column 5 now)
+            accumulated_after_reset = 0
             for m_idx, mp in enumerate(cycle_row.months):
-                cell = ws.cell(
-                    row=current_row, column=4 + m_idx,
-                    value=mp.km_accumulated,
+                cell = ws.cell(row=current_row, column=5 + m_idx)
+                is_intervention_cell = (
+                    (module.module_id, cycle_row.cycle_type, m_idx)
+                    in intervention_set
                 )
-                cell.alignment = right_align
-                cell.number_format = "#,##0"
 
-                if mp.exceeded:
+                if is_intervention_cell:
+                    # Intervention mark: show cycle code text
+                    cell.value = cycle_row.cycle_type
+                    cell.alignment = center_align
                     fill = FILL_MAP.get(cycle_row.cycle_type)
                     font = FONT_MAP.get(cycle_row.cycle_type)
                     if fill:
                         cell.fill = fill
                     if font:
                         cell.font = font
+                    accumulated_after_reset = 0
+                elif reset_from is not None and m_idx > reset_from:
+                    # After reset: recalculate km from 0
+                    accumulated_after_reset += avg_km
+                    cell.value = accumulated_after_reset
+                    cell.alignment = right_align
+                    cell.number_format = "#,##0"
+                    # Apply semaphore if recalculated value exceeds threshold
+                    if accumulated_after_reset >= cycle_row.cycle_km:
+                        fill = FILL_MAP.get(cycle_row.cycle_type)
+                        font = FONT_MAP.get(cycle_row.cycle_type)
+                        if fill:
+                            cell.fill = fill
+                        if font:
+                            cell.font = font
+                elif reset_from is not None and m_idx == reset_from:
+                    # At reset month (heir row, not the intervention row itself):
+                    # set to 0
+                    cell.value = 0
+                    cell.alignment = right_align
+                    cell.number_format = "#,##0"
+                    accumulated_after_reset = 0
+                else:
+                    # Normal cell: use original projection
+                    cell.value = mp.km_accumulated
+                    cell.alignment = right_align
+                    cell.number_format = "#,##0"
+                    if mp.exceeded:
+                        fill = FILL_MAP.get(cycle_row.cycle_type)
+                        font = FONT_MAP.get(cycle_row.cycle_type)
+                        if fill:
+                            cell.fill = fill
+                        if font:
+                            cell.font = font
 
             current_row += 1
 
+    # --- Summary rows: intervention counts per cycle per month ---
+    if intervention_set:
+        # Blank separator row
+        current_row += 1
+
+        # Count interventions per cycle per month
+        heavy_cycles = list(reversed(
+            CSR_HEAVY_CYCLES if fleet_type == "CSR"
+            else TOSHIBA_HEAVY_CYCLES
+        ))
+        summary_fill = PatternFill("solid", fgColor="F3F4F6")
+
+        for cycle_type, cycle_label, cycle_km in heavy_cycles:
+            # Label cell
+            label_cell = ws.cell(
+                row=current_row, column=3, value=cycle_type,
+            )
+            label_cell.alignment = center_align
+            label_cell.font = Font(bold=True)
+            fill = FILL_MAP.get(cycle_type)
+            if fill:
+                label_cell.fill = fill
+
+            # Count per month
+            total_row_count = 0
+            for m_idx in range(months):
+                count = sum(
+                    1 for mod_id, cyc, mi in intervention_set
+                    if cyc == cycle_type and mi == m_idx
+                )
+                cell = ws.cell(
+                    row=current_row, column=5 + m_idx, value=count,
+                )
+                cell.alignment = center_align
+                if count > 0:
+                    if fill:
+                        cell.fill = fill
+                total_row_count += count
+
+            current_row += 1
+
+        # Control (totals) row
+        ctrl_cell = ws.cell(row=current_row, column=3, value="Control")
+        ctrl_cell.font = Font(bold=True)
+        ctrl_cell.alignment = center_align
+        ctrl_cell.fill = summary_fill
+
+        for m_idx in range(months):
+            count = sum(
+                1 for _, _, mi in intervention_set if mi == m_idx
+            )
+            cell = ws.cell(
+                row=current_row, column=5 + m_idx, value=count,
+            )
+            cell.alignment = center_align
+            cell.font = Font(bold=True)
+            cell.fill = summary_fill
+
+        current_row += 1
+
     # Column widths
     ws.column_dimensions["A"].width = 10
-    ws.column_dimensions["B"].width = 8
-    ws.column_dimensions["C"].width = 12
-    for col in range(4, 4 + months):
+    ws.column_dimensions["B"].width = 12
+    ws.column_dimensions["C"].width = 8
+    ws.column_dimensions["D"].width = 12
+    for col in range(5, 5 + months):
         ws.column_dimensions[get_column_letter(col)].width = 12
 
-    # Freeze panes (header + module/cycle/threshold columns)
-    ws.freeze_panes = "D2"
+    # Freeze panes (header + module/fecha/cycle/threshold columns)
+    ws.freeze_panes = "E2"
 
     # Write to response
     buf = BytesIO()

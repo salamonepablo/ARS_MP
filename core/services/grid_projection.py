@@ -76,6 +76,7 @@ class CycleRow:
         cycle_km: Cycle threshold in km.
         color_bg: Tailwind bg class for exceeded cells.
         color_text: Tailwind text class for exceeded cells.
+        last_date: Date of the last intervention for this cycle (or None).
         months: List of MonthProjection, one per column.
     """
 
@@ -84,6 +85,7 @@ class CycleRow:
     cycle_km: int
     color_bg: str
     color_text: str
+    last_date: date | None = None
     months: list[MonthProjection] = field(default_factory=list)
 
 
@@ -200,6 +202,7 @@ class GridProjectionService:
                 - cycle_type (str)
                 - cycle_km (int)
                 - km_since (int | None)
+                - last_date (date | None, optional)
             avg_monthly_km: Average km per month for this fleet.
             months: How many months to project.
             reference_date: "Today".
@@ -219,6 +222,7 @@ class GridProjectionService:
         for cycle_type, cycle_label, cycle_km in heavy_cycles:
             entry = kd_lookup.get(cycle_type, {})
             km_since = entry.get("km_since")
+            last_date = entry.get("last_date")
             colors = CYCLE_COLORS.get(cycle_type, {"bg": "", "text": ""})
 
             projections = GridProjectionService.project_cycle(
@@ -235,6 +239,7 @@ class GridProjectionService:
                 cycle_km=cycle_km,
                 color_bg=colors["bg"],
                 color_text=colors["text"],
+                last_date=last_date,
                 months=projections,
             ))
 

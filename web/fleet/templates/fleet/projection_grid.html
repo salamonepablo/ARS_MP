@@ -82,10 +82,13 @@
                         <th class="sticky left-0 z-20 bg-gray-50 px-3 py-2 text-left font-semibold text-gray-700 border-b border-r border-gray-200 min-w-[80px]">
                             Modulo
                         </th>
-                        <th class="sticky left-[80px] z-20 bg-gray-50 px-3 py-2 text-left font-semibold text-gray-700 border-b border-r border-gray-200 min-w-[60px]">
+                        <th class="sticky left-[80px] z-20 bg-gray-50 px-2 py-2 text-center font-semibold text-gray-700 border-b border-r border-gray-200 min-w-[80px]">
+                            Fecha
+                        </th>
+                        <th class="sticky left-[160px] z-20 bg-gray-50 px-3 py-2 text-left font-semibold text-gray-700 border-b border-r border-gray-200 min-w-[60px]">
                             Ciclo
                         </th>
-                        <th class="sticky left-[140px] z-20 bg-gray-50 px-2 py-2 text-right font-semibold text-gray-700 border-b border-r border-gray-200 min-w-[70px]">
+                        <th class="sticky left-[220px] z-20 bg-gray-50 px-2 py-2 text-right font-semibold text-gray-700 border-b border-r border-gray-200 min-w-[70px]">
                             Umbral
                         </th>
                         {% for header in month_headers %}
@@ -110,15 +113,20 @@
                             </td>
                             {% endif %}
 
+                            <!-- Last intervention date -->
+                            <td class="sticky left-[80px] z-10 px-2 py-1.5 text-center text-[10px] text-gray-500 border-b border-r border-gray-200 whitespace-nowrap {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-100{% else %}bg-white{% endif %}">
+                                {% if row.last_date %}{{ row.last_date|date:"d/m/Y" }}{% else %}-{% endif %}
+                            </td>
+
                             <!-- Cycle type badge -->
-                            <td class="sticky left-[80px] z-10 px-3 py-1.5 border-b border-r border-gray-200 {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-100{% else %}bg-white{% endif %}">
+                            <td class="sticky left-[160px] z-10 px-3 py-1.5 border-b border-r border-gray-200 {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-100{% else %}bg-white{% endif %}">
                                 <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold {{ row.color_bg }} {{ row.color_text }}">
                                     {{ row.cycle_type }}
                                 </span>
                             </td>
 
                             <!-- Threshold -->
-                            <td class="sticky left-[140px] z-10 px-2 py-1.5 text-right text-gray-500 border-b border-r border-gray-200 {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-100{% else %}bg-white{% endif %}">
+                            <td class="sticky left-[220px] z-10 px-2 py-1.5 text-right text-gray-500 border-b border-r border-gray-200 {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-100{% else %}bg-white{% endif %}">
                                 {{ row.cycle_km|euro_number }}
                             </td>
 
@@ -130,6 +138,7 @@
                                 data-cycle-type="{{ row.cycle_type }}"
                                 data-month-idx="{{ forloop.counter0 }}"
                                 data-original-km="{{ cell.km_accumulated }}"
+                                data-threshold="{{ row.cycle_km }}"
                                 data-exceeded="{{ cell.exceeded|yesno:'true,false' }}"
                                 data-original-class="px-2 py-1.5 text-right border-b border-gray-100 cursor-pointer select-none whitespace-nowrap {% if cell.exceeded %}{{ row.color_bg }} {{ row.color_text }} font-semibold{% else %}text-gray-600{% endif %}"
                                 @dblclick="handleDblClick($event, '{{ module.module_id }}', '{{ row.cycle_type }}', {{ forloop.counter0 }}, {{ cell.km_accumulated }})">
@@ -140,12 +149,48 @@
                         {% endfor %}
                     {% empty %}
                         <tr>
-                            <td colspan="{{ month_headers|length|add:3 }}" class="text-center py-8 text-gray-400">
+                            <td colspan="{{ month_headers|length|add:4 }}" class="text-center py-8 text-gray-400">
                                 No hay datos disponibles para esta flota.
                             </td>
                         </tr>
                     {% endfor %}
                 </tbody>
+                <!-- Summary footer: count of interventions per cycle per month (updated dynamically by Alpine.js) -->
+                <tfoot class="border-t-2 border-gray-300" id="summary-footer">
+                    {% for sr in summary_cycles %}
+                    <tr class="bg-gray-50">
+                        <td colspan="3" class="sticky left-0 z-10 bg-gray-50 px-3 py-1.5 border-b border-r border-gray-200">
+                            <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold {{ sr.color_bg }} {{ sr.color_text }}">
+                                {{ sr.cycle_type }}
+                            </span>
+                        </td>
+                        <td class="sticky left-[220px] z-10 bg-gray-50 px-2 py-1.5 text-right text-gray-400 text-[10px] border-b border-r border-gray-200">
+                        </td>
+                        {% for header in month_headers %}
+                        <td class="px-2 py-1.5 text-center border-b border-gray-100 text-gray-700 font-semibold"
+                            data-summary-cycle="{{ sr.cycle_type }}"
+                            data-summary-month="{{ forloop.counter0 }}">
+                            <span class="summary-value">0</span>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                    <!-- Control row: total interventions per month -->
+                    <tr class="bg-gray-100 font-bold">
+                        <td colspan="3" class="sticky left-0 z-10 bg-gray-100 px-3 py-1.5 border-b border-r border-gray-200 text-gray-700 text-xs">
+                            Control
+                        </td>
+                        <td class="sticky left-[220px] z-10 bg-gray-100 px-2 py-1.5 text-right text-gray-400 text-[10px] border-b border-r border-gray-200">
+                        </td>
+                        {% for header in month_headers %}
+                        <td class="px-2 py-1.5 text-center border-b border-gray-100 text-gray-900"
+                            data-summary-cycle="TOTAL"
+                            data-summary-month="{{ forloop.counter0 }}">
+                            <span class="summary-value">0</span>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </div>
@@ -188,8 +233,11 @@ function projectionGrid() {
             'RB': { bg: 'bg-yellow-100', text: 'text-yellow-800' },
         },
 
+        // Number of month columns for summary iteration
+        totalMonths: {{ months }},
+
         init() {
-            // Nothing to initialize yet
+            // Initial summary is all zeros (no interventions marked yet)
         },
 
         /**
@@ -228,6 +276,9 @@ function projectionGrid() {
                 // Reset heir cycles (lower hierarchy) at this month
                 this.resetHeirs(moduleId, cycleType, monthIdx, hierarchy, cycleIndex);
             }
+
+            // Update summary footer counts
+            this.updateSummary();
         },
 
         /**
@@ -246,10 +297,8 @@ function projectionGrid() {
                 accumulated += avgKm;
                 const s = c.querySelector('.cell-value');
                 s.textContent = this.formatNumber(accumulated);
-                // Check threshold for semaphore
-                const threshold = parseInt(
-                    c.closest('tr').querySelector('td:nth-child(3)').textContent.replace(/\./g, '')
-                );
+                // Check threshold for semaphore (read from data attribute, not nth-child which breaks with rowspan)
+                const threshold = parseInt(c.dataset.threshold);
                 // Start from base classes, then apply appropriate colors
                 const baseClasses = 'px-2 py-1.5 text-right border-b border-gray-100 cursor-pointer select-none whitespace-nowrap';
                 if (accumulated >= threshold) {
@@ -320,10 +369,8 @@ function projectionGrid() {
                         // After intervention: accumulate from 0
                         accumulated += avgKm;
                         heirSpan.textContent = this.formatNumber(accumulated);
-                        // Check threshold
-                        const threshold = parseInt(
-                            heirCell.closest('tr').querySelector('td:nth-child(3)').textContent.replace(/\./g, '')
-                        );
+                        // Check threshold (read from data attribute, not nth-child which breaks with rowspan)
+                        const threshold = parseInt(heirCell.dataset.threshold);
                         if (accumulated >= threshold) {
                             // Re-apply exceeded color from the row
                             const badge = heirCell.closest('tr').querySelector('span[class*="bg-"]');
@@ -372,13 +419,70 @@ function projectionGrid() {
             cell.className = cell.dataset.originalClass;
         },
 
+        /**
+         * Recalculate the summary footer rows by counting intervention marks
+         * in the grid body. An intervention is any cell whose .cell-value text
+         * matches a cycle code (DA, PE, BA, AN, RG, RB).
+         */
+        updateSummary() {
+            const fleetType = '{{ fleet_param }}';
+            const hierarchy = fleetType === 'csr' ? this.hierarchyCSR : this.hierarchyToshiba;
+
+            // Initialize counters: { "DA": [0,0,...], "PE": [...], ... }
+            const counts = {};
+            hierarchy.forEach(c => {
+                counts[c] = new Array(this.totalMonths).fill(0);
+            });
+            const totals = new Array(this.totalMonths).fill(0);
+
+            // Scan all data cells for intervention marks
+            for (const [key, _] of Object.entries(this.interventions)) {
+                // key format: "M01-DA-3"  (moduleId-cycleType-monthIdx)
+                const parts = key.split('-');
+                // moduleId may contain dashes (unlikely but safe): cycle is second-to-last, month is last
+                const monthIdx = parseInt(parts[parts.length - 1]);
+                const cycleType = parts[parts.length - 2];
+                if (counts[cycleType] && monthIdx < this.totalMonths) {
+                    counts[cycleType][monthIdx]++;
+                    totals[monthIdx]++;
+                }
+            }
+
+            // Update summary cells in the DOM
+            hierarchy.forEach(cycle => {
+                for (let m = 0; m < this.totalMonths; m++) {
+                    const cell = document.querySelector(
+                        `td[data-summary-cycle="${cycle}"][data-summary-month="${m}"] .summary-value`
+                    );
+                    if (cell) {
+                        cell.textContent = counts[cycle][m];
+                    }
+                }
+            });
+            // Update totals row
+            for (let m = 0; m < this.totalMonths; m++) {
+                const cell = document.querySelector(
+                    `td[data-summary-cycle="TOTAL"][data-summary-month="${m}"] .summary-value`
+                );
+                if (cell) {
+                    cell.textContent = totals[m];
+                }
+            }
+        },
+
         formatNumber(num) {
             return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
         },
 
         exportExcel() {
-            // Build URL with current params
+            // Build URL with current params + intervention data
             const params = new URLSearchParams(window.location.search);
+
+            // Send interventions so Excel reflects what the user sees
+            if (Object.keys(this.interventions).length > 0) {
+                params.set('interventions', JSON.stringify(Object.keys(this.interventions)));
+            }
+
             window.location.href = '{% url "fleet:projection_grid" %}export/?' + params.toString();
         }
     };

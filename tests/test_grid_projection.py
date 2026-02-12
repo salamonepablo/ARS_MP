@@ -177,8 +177,9 @@ class TestProjectModule:
         assert isinstance(result, ModuleGridData)
         assert result.module_id == "M01"
         assert len(result.cycle_rows) == 4
-        assert result.cycle_rows[0].cycle_type == "AN"
-        assert result.cycle_rows[-1].cycle_type == "DA"
+        # Descending hierarchy order: DA first, AN last
+        assert result.cycle_rows[0].cycle_type == "DA"
+        assert result.cycle_rows[-1].cycle_type == "AN"
 
     def test_toshiba_module_returns_2_cycle_rows(self):
         """Toshiba module should have 2 heavy cycle rows (RB, RG)."""
@@ -195,8 +196,9 @@ class TestProjectModule:
             reference_date=date(2026, 2, 1),
         )
         assert len(result.cycle_rows) == 2
-        assert result.cycle_rows[0].cycle_type == "RB"
-        assert result.cycle_rows[1].cycle_type == "RG"
+        # Descending hierarchy order: RG first, RB last
+        assert result.cycle_rows[0].cycle_type == "RG"
+        assert result.cycle_rows[1].cycle_type == "RB"
 
 
 class TestGenerateGrid:

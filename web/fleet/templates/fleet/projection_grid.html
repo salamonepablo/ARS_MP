@@ -22,20 +22,20 @@
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
         <form method="get" action="{% url 'fleet:projection_grid' %}" class="flex flex-wrap items-end gap-4">
 
-            <!-- Fleet selector -->
+            <!-- Fleet selector - uses links instead of submit buttons to avoid hidden field conflict -->
             <div>
                 <label class="block text-xs text-gray-500 mb-1">Flota</label>
                 <div class="flex rounded-lg overflow-hidden border border-gray-300">
-                    <button type="submit" name="fleet" value="csr"
+                    <a href="{% url 'fleet:projection_grid' %}?fleet=csr&months={{ months }}&avg_km={{ avg_km }}"
                         class="px-4 py-2 text-sm font-medium transition-colors
                                {% if fleet_param == 'csr' %}bg-green-600 text-white{% else %}bg-white text-gray-600 hover:bg-green-50{% endif %}">
                         CSR
-                    </button>
-                    <button type="submit" name="fleet" value="toshiba"
+                    </a>
+                    <a href="{% url 'fleet:projection_grid' %}?fleet=toshiba&months={{ months }}&avg_km={{ avg_km_toshiba }}"
                         class="px-4 py-2 text-sm font-medium transition-colors border-l border-gray-300
                                {% if fleet_param == 'toshiba' %}bg-yellow-500 text-white{% else %}bg-white text-gray-600 hover:bg-yellow-50{% endif %}">
                         Toshiba
-                    </button>
+                    </a>
                 </div>
             </div>
 
@@ -98,27 +98,27 @@
                 <tbody>
                     {% for module in grid %}
                         {% for row in module.cycle_rows %}
-                        <tr class="{% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-50/50{% endif %} hover:bg-blue-50/30 transition-colors"
+                        <tr class="{% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-50{% endif %} hover:bg-blue-50/30 transition-colors"
                             data-module="{{ module.module_id }}"
                             data-cycle="{{ row.cycle_type }}">
 
                             <!-- Module ID (only on first cycle row) -->
                             {% if forloop.first %}
-                            <td class="sticky left-0 z-10 bg-white px-3 py-1.5 font-bold text-gray-900 border-b border-r border-gray-200 {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-50/50{% endif %}"
+                            <td class="sticky left-0 z-10 px-3 py-1.5 font-bold text-gray-900 border-b border-r border-gray-200 {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-100{% else %}bg-white{% endif %}"
                                 rowspan="{{ module.cycle_rows|length }}">
                                 {{ module.module_id }}
                             </td>
                             {% endif %}
 
                             <!-- Cycle type badge -->
-                            <td class="sticky left-[80px] z-10 bg-white px-3 py-1.5 border-b border-r border-gray-200 {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-50/50{% endif %}">
+                            <td class="sticky left-[80px] z-10 px-3 py-1.5 border-b border-r border-gray-200 {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-100{% else %}bg-white{% endif %}">
                                 <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold {{ row.color_bg }} {{ row.color_text }}">
                                     {{ row.cycle_type }}
                                 </span>
                             </td>
 
                             <!-- Threshold -->
-                            <td class="sticky left-[140px] z-10 bg-white px-2 py-1.5 text-right text-gray-500 border-b border-r border-gray-200 {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-50/50{% endif %}">
+                            <td class="sticky left-[140px] z-10 px-2 py-1.5 text-right text-gray-500 border-b border-r border-gray-200 {% if forloop.parentloop.counter|divisibleby:2 %}bg-gray-100{% else %}bg-white{% endif %}">
                                 {{ row.cycle_km|euro_number }}
                             </td>
 
@@ -131,6 +131,7 @@
                                 data-month-idx="{{ forloop.counter0 }}"
                                 data-original-km="{{ cell.km_accumulated }}"
                                 data-exceeded="{{ cell.exceeded|yesno:'true,false' }}"
+                                data-original-class="px-2 py-1.5 text-right border-b border-gray-100 cursor-pointer select-none whitespace-nowrap {% if cell.exceeded %}{{ row.color_bg }} {{ row.color_text }} font-semibold{% else %}text-gray-600{% endif %}"
                                 @dblclick="handleDblClick($event, '{{ module.module_id }}', '{{ row.cycle_type }}', {{ forloop.counter0 }}, {{ cell.km_accumulated }})">
                                 <span class="cell-value">{{ cell.km_accumulated|euro_number }}</span>
                             </td>
@@ -151,7 +152,7 @@
 
     <!-- Legend -->
     <div class="mt-4 flex flex-wrap gap-4 text-xs text-gray-500">
-        <span class="font-medium">Semaforo:</span>
+        <span class="font-medium">Tipo Intervencion:</span>
         {% if fleet_param == 'csr' %}
         <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-100 border border-green-300"></span> AN ({{ "187500"|euro_number }} km)</span>
         <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-yellow-100 border border-yellow-300"></span> BA ({{ "375000"|euro_number }} km)</span>
@@ -177,6 +178,16 @@ function projectionGrid() {
         hierarchyCSR: ['DA', 'PE', 'BA', 'AN'],
         hierarchyToshiba: ['RG', 'RB'],
 
+        // Cycle colors for intervention marking (matching the badge colors)
+        cycleColors: {
+            'DA': { bg: 'bg-red-100', text: 'text-red-800' },
+            'PE': { bg: 'bg-sky-100', text: 'text-sky-800' },
+            'BA': { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+            'AN': { bg: 'bg-green-100', text: 'text-green-800' },
+            'RG': { bg: 'bg-red-100', text: 'text-red-800' },
+            'RB': { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+        },
+
         init() {
             // Nothing to initialize yet
         },
@@ -199,22 +210,80 @@ function projectionGrid() {
                 // UNMARK: restore original values
                 delete this.interventions[key];
                 this.restoreCell(cell, span, originalKm);
+                // Restore same-row cells to the right
+                this.restoreSameRow(moduleId, cycleType, monthIdx);
                 // Restore heir cells
                 this.restoreHeirs(moduleId, cycleType, monthIdx, hierarchy, cycleIndex);
             } else {
                 // MARK intervention
                 this.interventions[key] = true;
                 span.textContent = cycleType;
-                // Remove exceeded styling, add intervention style
-                cell.className = cell.className
-                    .replace(/bg-\w+-100/g, '')
-                    .replace(/text-\w+-800/g, '')
-                    .replace(/font-semibold/g, '');
-                cell.classList.add('bg-blue-100', 'text-blue-800', 'font-bold', 'text-center');
+                // Apply base classes with cycle-specific colors (centered for intervention mark)
+                const baseClasses = 'px-2 py-1.5 text-center border-b border-gray-100 cursor-pointer select-none whitespace-nowrap';
+                const colors = this.cycleColors[cycleType];
+                cell.className = `${baseClasses} ${colors?.bg || ''} ${colors?.text || ''} font-bold`;
 
+                // Reset same-row cells to the right (accumulate from 0)
+                this.resetSameRow(moduleId, cycleType, monthIdx);
                 // Reset heir cycles (lower hierarchy) at this month
                 this.resetHeirs(moduleId, cycleType, monthIdx, hierarchy, cycleIndex);
             }
+        },
+
+        /**
+         * Reset cells in the SAME row to the right of the intervention.
+         * From monthIdx+1 onward: accumulate from 0 with avgKm.
+         */
+        resetSameRow(moduleId, cycleType, monthIdx) {
+            const avgKm = parseInt('{{ avg_km }}');
+            const cells = document.querySelectorAll(
+                `td[data-module-id="${moduleId}"][data-cycle-type="${cycleType}"]`
+            );
+
+            let accumulated = 0;
+            cells.forEach((c, idx) => {
+                if (idx <= monthIdx) return; // Skip cells at or before intervention
+                accumulated += avgKm;
+                const s = c.querySelector('.cell-value');
+                s.textContent = this.formatNumber(accumulated);
+                // Check threshold for semaphore
+                const threshold = parseInt(
+                    c.closest('tr').querySelector('td:nth-child(3)').textContent.replace(/\./g, '')
+                );
+                // Start from base classes, then apply appropriate colors
+                const baseClasses = 'px-2 py-1.5 text-right border-b border-gray-100 cursor-pointer select-none whitespace-nowrap';
+                if (accumulated >= threshold) {
+                    const badge = c.closest('tr').querySelector('span[class*="bg-"]');
+                    if (badge) {
+                        const bgClass = Array.from(badge.classList).find(cl => cl.startsWith('bg-'));
+                        const textClass = Array.from(badge.classList).find(cl => cl.startsWith('text-'));
+                        c.className = `${baseClasses} ${bgClass || ''} ${textClass || ''} font-semibold`;
+                    }
+                } else {
+                    c.className = `${baseClasses} text-gray-600`;
+                }
+                c.dataset.overrideKm = String(accumulated);
+            });
+        },
+
+        /**
+         * Restore same-row cells to the right when unmarking intervention.
+         */
+        restoreSameRow(moduleId, cycleType, monthIdx) {
+            const cells = document.querySelectorAll(
+                `td[data-module-id="${moduleId}"][data-cycle-type="${cycleType}"]`
+            );
+
+            cells.forEach((c, idx) => {
+                if (idx <= monthIdx) return;
+                const origKm = parseInt(c.dataset.originalKm);
+                const s = c.querySelector('.cell-value');
+
+                s.textContent = this.formatNumber(origKm);
+                delete c.dataset.overrideKm;
+                // Restore original class from data attribute
+                c.className = c.dataset.originalClass;
+            });
         },
 
         /**
@@ -224,6 +293,7 @@ function projectionGrid() {
         resetHeirs(moduleId, cycleType, monthIdx, hierarchy, cycleIndex) {
             if (cycleIndex < 0) return;
             const avgKm = parseInt('{{ avg_km }}');
+            const baseClasses = 'px-2 py-1.5 text-right border-b border-gray-100 cursor-pointer select-none whitespace-nowrap';
 
             // All cycles below this one in the hierarchy
             for (let i = cycleIndex + 1; i < hierarchy.length; i++) {
@@ -243,12 +313,8 @@ function projectionGrid() {
                         // At intervention month: set to 0
                         heirSpan.textContent = '0';
                         accumulated = 0;
-                        // Clear exceeded styling
-                        heirCell.className = heirCell.className
-                            .replace(/bg-\w+-100/g, '')
-                            .replace(/text-\w+-800/g, '')
-                            .replace(/font-semibold/g, '');
-                        heirCell.classList.add('text-gray-600');
+                        // Clear exceeded styling, apply base classes
+                        heirCell.className = `${baseClasses} text-gray-600`;
                         heirCell.dataset.overrideKm = '0';
                     } else {
                         // After intervention: accumulate from 0
@@ -258,22 +324,16 @@ function projectionGrid() {
                         const threshold = parseInt(
                             heirCell.closest('tr').querySelector('td:nth-child(3)').textContent.replace(/\./g, '')
                         );
-                        heirCell.className = heirCell.className
-                            .replace(/bg-\w+-100/g, '')
-                            .replace(/text-\w+-800/g, '')
-                            .replace(/font-semibold/g, '');
                         if (accumulated >= threshold) {
                             // Re-apply exceeded color from the row
                             const badge = heirCell.closest('tr').querySelector('span[class*="bg-"]');
                             if (badge) {
                                 const bgClass = Array.from(badge.classList).find(c => c.startsWith('bg-'));
                                 const textClass = Array.from(badge.classList).find(c => c.startsWith('text-'));
-                                if (bgClass) heirCell.classList.add(bgClass);
-                                if (textClass) heirCell.classList.add(textClass);
-                                heirCell.classList.add('font-semibold');
+                                heirCell.className = `${baseClasses} ${bgClass || ''} ${textClass || ''} font-semibold`;
                             }
                         } else {
-                            heirCell.classList.add('text-gray-600');
+                            heirCell.className = `${baseClasses} text-gray-600`;
                         }
                         heirCell.dataset.overrideKm = String(accumulated);
                     }
@@ -296,58 +356,20 @@ function projectionGrid() {
                 heirCells.forEach((heirCell, idx) => {
                     if (idx < monthIdx) return;
                     const origKm = parseInt(heirCell.dataset.originalKm);
-                    const exceeded = heirCell.dataset.exceeded === 'true';
                     const heirSpan = heirCell.querySelector('.cell-value');
 
                     heirSpan.textContent = this.formatNumber(origKm);
                     delete heirCell.dataset.overrideKm;
-
-                    // Restore original styling
-                    heirCell.className = heirCell.className
-                        .replace(/bg-\w+-100/g, '')
-                        .replace(/text-\w+-800/g, '')
-                        .replace(/font-semibold/g, '')
-                        .replace(/font-bold/g, '')
-                        .replace(/text-center/g, '');
-
-                    if (exceeded) {
-                        const badge = heirCell.closest('tr').querySelector('span[class*="bg-"]');
-                        if (badge) {
-                            const bgClass = Array.from(badge.classList).find(c => c.startsWith('bg-'));
-                            const textClass = Array.from(badge.classList).find(c => c.startsWith('text-'));
-                            if (bgClass) heirCell.classList.add(bgClass);
-                            if (textClass) heirCell.classList.add(textClass);
-                            heirCell.classList.add('font-semibold');
-                        }
-                    } else {
-                        heirCell.classList.add('text-gray-600');
-                    }
+                    // Restore original class from data attribute
+                    heirCell.className = heirCell.dataset.originalClass;
                 });
             }
         },
 
         restoreCell(cell, span, originalKm) {
-            const exceeded = cell.dataset.exceeded === 'true';
             span.textContent = this.formatNumber(originalKm);
-
-            cell.className = cell.className
-                .replace(/bg-\w+-100/g, '')
-                .replace(/text-\w+-800/g, '')
-                .replace(/font-bold/g, '')
-                .replace(/text-center/g, '');
-
-            if (exceeded) {
-                const badge = cell.closest('tr').querySelector('span[class*="bg-"]');
-                if (badge) {
-                    const bgClass = Array.from(badge.classList).find(c => c.startsWith('bg-'));
-                    const textClass = Array.from(badge.classList).find(c => c.startsWith('text-'));
-                    if (bgClass) cell.classList.add(bgClass);
-                    if (textClass) cell.classList.add(textClass);
-                    cell.classList.add('font-semibold');
-                }
-            } else {
-                cell.classList.add('text-gray-600');
-            }
+            // Restore original class from data attribute
+            cell.className = cell.dataset.originalClass;
         },
 
         formatNumber(num) {

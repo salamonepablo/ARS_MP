@@ -207,10 +207,11 @@ class GridProjectionService:
         Returns:
             ``ModuleGridData`` with one ``CycleRow`` per heavy cycle.
         """
-        heavy_cycles = (
+        # Reversed: highest hierarchy first (DA, PE, BA, AN / RG, RB)
+        heavy_cycles = list(reversed(
             CSR_HEAVY_CYCLES if fleet_type == "CSR"
             else TOSHIBA_HEAVY_CYCLES
-        )
+        ))
         # Build lookup from key_data
         kd_lookup = {d["cycle_type"]: d for d in key_data}
 

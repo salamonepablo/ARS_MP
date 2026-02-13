@@ -1,0 +1,8 @@
+query_name,query_type,remarks
+3_NUM_un_NSAP,VIEW,
+A_00_Kilometraje_Máx,VIEW,
+A_14_Cambio_Coches_Último1,VIEW,
+A_14_Cambio_Coches_Último2,VIEW,
+A_14_Cambio_Módulos_Último1,VIEW,
+A_14_Cambio_Módulos_Último2,VIEW,
+A_14_Estado_Formaciones_Consulta,VIEW,

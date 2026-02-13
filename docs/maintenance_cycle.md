@@ -29,7 +29,7 @@ En el mantenimiento de material rodante ferroviario, los **ciclos de mantenimien
 
 | Código | Intervención | Frecuencia (km) | Frecuencia (tiempo) |
 |---|---|---:|---:|
-| RS / PE | Reparación Pentanual / Intervención de Separación | 750.000 | 5 años |
+| RS / PE | Reparación de Separación / Intervención Pentanual | 750.000 | 5 años |
 | DA / RG | Reparación Decanual / Reparación General | 1.500.000 | 10 años |
 
 ---

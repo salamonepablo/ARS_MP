@@ -60,4 +60,5 @@ km_restante_mes = (km_promedio_mensual / dias_del_mes) * dias_restantes
 Boton **"Exportar a Excel"** genera un archivo .xlsx con:
 - Mismos colores del semaforo
 - Formato numerico con separador de miles
-- Columnas fijas (modulo, ciclo, umbral)
+- Columnas fijas (modulo, fecha ultima intervencion, ciclo, umbral)
+- Fila resumen por ciclo y fila "Control" de totales

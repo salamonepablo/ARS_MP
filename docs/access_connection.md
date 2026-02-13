@@ -117,20 +117,32 @@ For full schema documentation, see `docs/legacy_bd/introspection/`.
 
 ### Unit Tests
 
-Tests are designed to work without the real database:
+Tests are designed to work without the real database (all Access calls are mocked):
 
-```bash
-pytest tests/test_access_connection.py -v
+```powershell
+py -m pytest tests/test_access_connection.py -v
 ```
 
 ### Integration Tests
 
-Integration tests require the database and are skipped when unavailable:
+Integration tests are decorated with `@pytest.mark.integration` and **excluded
+from the default test run** (configured in `pytest.ini` via `-m "not integration"`).
 
-```bash
-# These will be skipped if database is not configured
-pytest tests/test_access_connection.py::TestIntegrationWithRealDatabase -v
+They require:
+- The `.accdb` file present at the path specified in `LEGACY_ACCESS_DB_PATH`
+- `LEGACY_ACCESS_DB_PASSWORD` set (if the database is protected)
+- The Microsoft Access ODBC driver installed
+
+```powershell
+# Run ONLY integration tests
+py -m pytest -m integration -v
+
+# Run ALL tests (unit + integration)
+py -m pytest -m "" -v
 ```
+
+> **Note**: In the default `py -m pytest` run these tests appear as
+> *2 deselected* — not as *skipped*.
 
 ## Troubleshooting
 

@@ -1,75 +1,248 @@
 # ARS_MP — Argentinian Rolling Stock Maintenance Planner
 
-Sistema de proyeccion y planificacion de mantenimiento ferroviario para material rodante argentino.
-Enfoque: **ETL** desde fuentes legacy (Access/CSV/Excel) y **visualizacion web**.
+> **Trabajo Final de Master — Master en Desarrollo con IA (BIG School)**
 
-## Estado actual
+Sistema de proyeccion y planificacion de mantenimiento ferroviario para el material rodante de **Linea Roca** (Buenos Aires, Argentina). Herramienta ETL intermedia con interfaz web que extrae datos de sistemas legacy, proyecta kilometrajes por ciclo de mantenimiento pesado y genera grillas interactivas para la toma de decisiones operativas.
 
-- Estructura base creada (capas `core/`, `etl/`, `web/`, `infrastructure/`, `tests/`, `docs/`).
-- Documentacion inicial y fuentes de prueba disponibles en `docs/legacy_bd/`.
-- **Vista de flota** con 111 tarjetas de modulos (CSR + Toshiba) con datos mock.
+## Problema que resuelve
 
-## Stack
+La operadora ferroviaria gestiona **111 modulos** (86 CSR + 25 Toshiba) con sistemas legacy heterogeneos: bases Access (.mdb/.accdb) desde los anos 90, planillas Excel manuales y aplicaciones VB6. No existe una vista unificada que permita:
+
+- Ver el estado de mantenimiento de toda la flota en un solo lugar
+- Proyectar cuando cada modulo alcanzara su proximo ciclo de mantenimiento pesado
+- Simular intervenciones y ver su impacto en cascada sobre ciclos inferiores
+- Exportar la planificacion a Excel para compartir con talleres y gerencia
+
+ARS_MP resuelve esto con un pipeline ETL que normaliza datos legacy y una interfaz web interactiva.
+
+## Screenshots
+
+### Vista encabezado — Resumen de Kms flota
+![Encabezado](docs/images/image.png)
+
+### Vista de flota — Tarjetas de modulos
+
+#### CSR
+![Tarjetas de Flota CSR](docs/images/image-1.png)
+
+#### Toshiba
+![Tarjetas de Flota Toshiba](docs/images/image-2.png)
+
+*111 tarjetas con KM mensual, KM total, ultimo mantenimiento y dias transcurridos. Filtrable por flota (CSR / Toshiba).*
+
+### Detalle de modulo
+
+![Detalle modulo](docs/images/image-3.png)
+
+*Informacion general, kilometraje, ultimo mantenimiento, proxima intervencion estimada, y tabla de datos clave por ciclo pesado con barras de progreso.*
+
+### Indicacion de origen de datos
+![Origen de Datos](docs/images/image-3.png)
+
+*Timestamp de la ultima sincronizacion con el origen de datos y manager de sincronizacion. Al despliegue en produccion se incorporara un trigger para sincronizacion automatica.*
+
+### Maintenance Planner — Grilla de proyeccion
+
+#### CSR
+![Grilla de proyeccion](docs/images/image-4.png)
+
+![Grilla de proyeccion 2](docs/images/image-5.png)
+
+#### Toshiba
+![Grilla de proyeccion 3](docs/images/image-6.png)
+
+![Grilla de proyeccion 4](docs/images/image-7.png)
+
+### Resumen al pie de la grilla
+![Resumen](docs/images/image-8.png)
+
+*Grilla interactiva: filas por modulo y ciclo pesado, columnas por mes (18 por defecto). Semaforo de colores cuando el KM acumulado supera el umbral. Doble-click para marcar intervenciones con reset en cascada por jerarquia. Totalizadores mensuales al final de la grilla.*
+
+### Exportacion a Excel
+
+![Excel export](docs/images/image-9.png)
+
+*Exportacion fiel con colores, intervenciones marcadas, filas de resumen por ciclo y fila "Control" de totales.*
+
+### Fuente de datos legacy (Access)
+
+![Access legacy db](docs/images/image-10.png)
+
+*Base de datos Access (.accdb) con 57 tablas — sistema en produccion desde 2022.*
+
+## Stack tecnologico
 
 | Componente | Tecnologia |
 |------------|------------|
-| Lenguaje | Python 3.11+ |
+| Lenguaje | Python 3.11+ (type hints) |
 | Framework Web | Django 5.0+ |
-| Base de Datos | PostgreSQL 15+ (SQLite en dev) |
-| ETL | pandas, openpyxl, pyodbc |
+| Base de Datos | PostgreSQL 15+ (Docker) |
+| ETL | pandas, openpyxl, pyodbc (ODBC → Access) |
 | Frontend | Django Templates + HTMX + Alpine.js |
 | Estilos | Tailwind CSS v4 |
-| Contenedores | Docker + Docker Compose |
-| Testing | pytest + coverage |
+| Contenedores | Docker Compose (PostgreSQL) |
+| Testing | pytest (214 tests) + coverage |
+| Export | openpyxl (Excel con formato) |
+| Control de versiones | Git + GitHub |
 
-## Arquitectura (Clean Architecture + DDD simplificado)
+## Arquitectura
 
-- `core/`: dominio y logica de negocio (Python puro, sin Django)
-- `etl/`: extractores/transformadores/loaders hacia PostgreSQL
-- `web/`: apps Django (UI + endpoints)
-- `infrastructure/`: implementaciones concretas (DB, integraciones externas)
+Clean Architecture + DDD simplificado. La capa `core/` es **Python puro** sin dependencias de Django.
 
 ```
 ARS_MP/
-├── core/
-│   ├── domain/
-│   ├── interfaces/
-│   └── services/
-├── etl/
-│   ├── extractors/
+├── core/                  # Dominio y logica de negocio (PURO Python)
+│   ├── domain/            # Entidades: Coach, EMU, Formation, MaintenanceUnit
+│   │   ├── entities/
+│   │   └── value_objects/
+│   ├── services/          # GridProjectionService, MaintenanceProjection
+│   └── interfaces/        # Contratos/abstracciones
+├── etl/                   # Pipeline ETL
+│   ├── extractors/        # access_connection, access_extractor, postgres_extractor
 │   ├── transformers/
 │   └── loaders/
-├── infrastructure/
-│   ├── database/
-│   └── external/
-├── web/
-│   ├── fleet/
-│   ├── projections/
-│   ├── reports/
-│   └── api/
-├── theme/              # Tailwind CSS theme
-├── templates/          # Base templates
-├── tests/
-├── docs/
-└── context/
+├── web/                   # Django apps
+│   └── fleet/             # Vistas: flota, detalle, planner, export
+│       ├── views.py
+│       ├── urls.py
+│       ├── stub_data.py   # Datos de fallback (111 modulos)
+│       └── templates/
+├── infrastructure/        # Implementaciones concretas
+│   └── database/          # Modelos Django (StgModulo, StgKilometraje, etc.)
+├── templates/             # Base templates (navbar, layout)
+├── theme/                 # Tailwind CSS v4
+├── tests/                 # 214 tests (97% coverage en core/)
+├── docs/                  # Documentacion del proyecto
+│   ├── decisions/         # ADRs (Architecture Decision Records)
+│   ├── images/            # Screenshots del README
+│   ├── legacy_bd/         # Archivos legacy de prueba + schema introspection
+│   ├── ai_workflow.md     # Proceso de desarrollo asistido con IA
+│   ├── slides_guion.md    # Guion para la presentacion de slides
+│   ├── CHANGELOG.md       # Historial de cambios (Keep a Changelog)
+│   ├── access_connection.md # Configuracion de conexion Access + troubleshooting
+│   ├── maintenance_cycle.md # Ciclos de mantenimiento y reglas de negocio
+│   ├── postgres_docker.md 
+│   └── rolling_stock_fleet.md # Descripcion de la flota ferroviaria
+├── context/               # Contexto de negocio y prompts de IA
+│   ├── prompts/           # Prompts numerados usados para generar codigo con IA
+│   grilla_proyeccion.md   # Reglas de negocio de la grilla (espanol)
+├── AGENTS.md              # "Constitucion" del proyecto para asistentes de IA
+├── scripts/               # Utilidades (test conexion, toggle path)
+├── config/                # Django settings
+├── docker-compose.yml     
+└── requirements.txt       
 ```
 
-## Quickstart (desarrollo)
+### Principios de diseno
 
-### 1) Crear entorno virtual
+- **Separation of Concerns**: `core/` no importa Django. `etl/` no conoce la UI. `web/` orquesta.
+- **Dependency Inversion**: La logica de negocio define interfaces; la infraestructura las implementa.
+- **Fallback graceful**: Si Access no esta disponible, el sistema usa datos stub (111 modulos).
+- **Read-only ETL**: Todas las conexiones a bases legacy son `ReadOnly=1` por seguridad.
+
+## Funcionalidades principales
+
+### 1. ETL desde sistemas legacy
+
+- **Extraccion**: Conectores ODBC a Access (.mdb/.accdb), CSV con encoding BOM-safe, Excel
+- **Staging**: Tablas PostgreSQL intermedias (`StgModulo`, `StgKilometraje`, `StgMantenimiento`)
+- **Sync incremental**: Comando `py manage.py sync_access` con logging y estadisticas
+- **Fallback**: Si la BD Access no esta disponible, la app funciona con datos stub
+
+### 2. Vista de flota (111 tarjetas)
+
+- **URL**: `/fleet/modules/`
+- Tarjetas por modulo con: KM mes, KM total, ultimo mantenimiento, tipo, fecha, dias transcurridos
+- Filtros: todos / CSR / Toshiba
+- Link a detalle de cada modulo
+
+### 3. Detalle de modulo
+
+- **URL**: `/fleet/modules/<module_id>/`
+- Información general, kilometraje, composición de coches
+- Tabla de mantenimiento pesado con barras de progreso por ciclo
+- Historial de intervenciones (último año)
+- Selector rápido para navegar entre módulos
+
+### 4. Maintenance Planner (grilla de proyección)
+
+- **URL**: `/fleet/planner/`
+- Grilla tipo Excel: filas = modulo x ciclo pesado, columnas = meses (configurable, default 18)
+- **Ciclos pesados CSR**: DA (1.500.000 km) > PE (750.000) > BA (375.000) > AN (187.500)
+- **Ciclos pesados Toshiba**: RG (600.000 km) > RB (300.000)
+- Semáforo de colores cuando KM acumulado supera umbral
+- **Doble-click interactivo**: marca intervención, resetea KM a 0 en esa fila y filas herederas (jerarquía), con propagación en cascada
+- Prorrateo del mes actual según día del mes
+- Columnas sticky (Módulo, Fecha, Ciclo, Umbral) para scroll horizontal
+- Fila resumen por ciclo + fila "Control" de totales
+- Selector de flota (CSR / Toshiba), meses y KM promedio mensual configurables
+
+### 5. Exportacion a Excel
+
+- **URL**: `/fleet/planner/export/`
+- Archivo `.xlsx` con colores identicos al semaforo web
+- Intervenciones marcadas en el browser se incluyen en el Excel
+- Freeze panes, formato numerico europeo, filas de resumen
+- Nombre del archivo con fecha: `proyeccion_csr_2026-02-12.xlsx`
+
+### 6. Jerarquia de mantenimiento
+
+- **Regla clave**: una intervencion de mayor jerarquia "pisa" (resetea) todas las inferiores
+- CSR: DA > PE > BA > AN > IB > IQ (6 ciclos, 4 pesados)
+- Toshiba: RG > RB > MEN (3 ciclos, 2 pesados)
+- La herencia se rastrea con campo `inherited_from` en los datos de cada ciclo
+
+## Instalacion y ejecucion
+
+### Prerequisitos
+
+- Python 3.11+
+- Node.js 18+ (para Tailwind CSS)
+- Docker Desktop (para PostgreSQL)
+- Microsoft Access ODBC Driver (opcional, para ETL real)
+
+### 1) Clonar el repositorio
+
+```powershell
+git clone https://github.com/salamonepablo/ARS_MP.git
+cd ARS_MP
+```
+
+### 2) Crear entorno virtual e instalar dependencias
 
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-### 2) Instalar dependencias Python
-
-```powershell
 pip install -r requirements.txt
 ```
 
-### 3) Instalar dependencias Node.js (Tailwind CSS)
+### 3) Configurar variables de entorno
+
+```powershell
+cp .env.example .env
+# Editar .env con las credenciales de PostgreSQL
+```
+
+### 4) Levantar PostgreSQL con Docker
+
+```powershell
+docker compose up -d db
+```
+
+### 5) Ejecutar migraciones
+
+```powershell
+py manage.py migrate
+```
+
+### 6) (Opcional) Sincronizar datos desde Access
+
+```powershell
+# Requiere ODBC driver + .accdb configurado en .env
+py manage.py sync_access
+```
+
+### 7) Compilar Tailwind CSS
 
 ```powershell
 cd theme/static_src
@@ -78,79 +251,117 @@ npm run build
 cd ../..
 ```
 
-### 4) Ejecutar migraciones
-
-```powershell
-py manage.py migrate
-```
-
-### 5) Iniciar servidor de desarrollo
+### 8) Iniciar servidor de desarrollo
 
 ```powershell
 py manage.py runserver
 ```
 
-Acceder a: **http://127.0.0.1:8000/fleet/modules/**
+Acceder a:
 
-### 6) (Opcional) Modo desarrollo con hot-reload de CSS
+| Vista | URL |
+|-------|-----|
+| Flota (tarjetas) | http://127.0.0.1:8000/fleet/modules/ |
+| Detalle modulo | http://127.0.0.1:8000/fleet/modules/M01/ |
+| Maintenance Planner | http://127.0.0.1:8000/fleet/planner/ |
 
-En una terminal separada:
+## Testing
 
 ```powershell
-cd theme/static_src
-npm run dev
+# Ejecutar toda la suite (excluye tests de integracion por defecto)
+py -m pytest
+
+# Con coverage
+py -m pytest --cov=core --cov=etl
+
+# Solo tests de integracion (requieren BD Access real + .env configurado)
+py -m pytest -m integration
+
+# Todos los tests, incluyendo integracion
+py -m pytest -m ""
 ```
 
-## Vista de Flota
+### Resultados actuales
 
-La vista principal muestra **111 tarjetas** de modulos:
+```
+214 passed, 2 deselected (integration)
+core/services/ — 97% coverage
+```
 
-- **86 Modulos CSR** (M01-M86)
-  - M01-M42: Cuadruplas (4 coches)
-  - M43-M86: Triplas (3 coches)
-- **25 Modulos Toshiba** (T01-T25)
-  - T01-T12: Cuadruplas (4 coches)
-  - T13-T25: Triplas (3 coches)
+### Markers
 
-Cada tarjeta muestra:
-- Kilometraje del mes actual
-- Kilometraje total acumulado
-- Ultimo mantenimiento (tipo, fecha, dias transcurridos)
-- KM desde ultimo mantenimiento
+| Marker | Descripcion |
+|--------|-------------|
+| `integration` | Tests que requieren conexion real a la BD Access via ODBC. Excluidos por defecto en `pytest.ini`. |
 
-### Filtros disponibles
+### Distribucion de tests
 
-- `/fleet/modules/` - Todos los modulos
-- `/fleet/modules/?fleet=csr` - Solo CSR
-- `/fleet/modules/?fleet=toshiba` - Solo Toshiba
+| Modulo | Tests | Cobertura |
+|--------|-------|-----------|
+| Grid projection service | 20 | core/services/ 97% |
+| Maintenance projection | 31 | |
+| Fleet views | 24 | |
+| PostgreSQL extractor | 26 | |
+| Access connection | 17 | |
+| Stub data | 22 | |
+| Domain entities | 74 | |
 
-## Datos legacy de ejemplo
+## Estructura del proyecto
 
-En `docs/legacy_bd/` hay archivos `.mdb/.accdb` y CSV de prueba usados para el desarrollo de ETL.
+| Directorio | Proposito |
+|------------|-----------|
+| `core/` | Logica de negocio pura (sin Django). Entidades, value objects, servicios de proyeccion. |
+| `etl/` | Pipeline ETL: extractores (Access, PostgreSQL), transformadores, loaders. |
+| `web/fleet/` | App Django: vistas, templates, URLs, template tags. |
+| `infrastructure/` | Modelos Django (staging tables), integraciones externas. |
+| `tests/` | 214 tests organizados por modulo. |
+| `docs/` | Documentacion tecnica en ingles: ADRs, schema legacy, screenshots, CHANGELOG. |
+| `context/` | Reglas de negocio en espanol. |
+| `scripts/` | Utilidades: test de conexion, toggle de path local/remoto. |
 
-## Documentacion
+## Documentacion adicional
 
-- Documentacion tecnica: `docs/` (en ingles)
-- Reglas/criterios de negocio: `context/` (en espanol)
+| Documento | Descripcion |
+|-----------|-------------|
+| [docs/decisions/projection_grid.md](docs/decisions/projection_grid.md) | ADR: diseno de la grilla de proyeccion |
+| [docs/decisions/access_to_postgres_staging.md](docs/decisions/access_to_postgres_staging.md) | ADR: migracion de ODBC directo a staging PostgreSQL |
+| [docs/access_connection.md](docs/access_connection.md) | Configuracion de conexion Access + troubleshooting |
+| [docs/postgres_docker.md](docs/postgres_docker.md) | Setup de PostgreSQL con Docker |
+| [docs/maintenance_cycle.md](docs/maintenance_cycle.md) | Ciclos de mantenimiento por flota |
+| [context/grilla_proyeccion.md](context/grilla_proyeccion.md) | Reglas de negocio de la grilla (espanol) |
+| [docs/CHANGELOG.md](docs/CHANGELOG.md) | Historial de cambios |
+| [docs/ai_workflow.md](docs/ai_workflow.md) | Proceso de desarrollo asistido con IA |
+| [context/prompts/](context/prompts/) | Prompts utilizados para generar el codigo con IA |
 
-Cada feature implementada debe dejar:
+<!-- ## Despliegue
 
-- Codigo + tests
-- Un apunte breve en `docs/` o `context/` segun corresponda
+TODO: Agregar informacion de despliegue cuando se defina la estrategia.
+-->
 
-## Convenciones
+## Slides de presentacion
+
+<!-- TODO: Agregar link a Google Slides cuando esten listas -->
+*Pendiente — se agregara el link a la presentacion de Google Slides.*
+
+## Convenciones de codigo
 
 - Codigo en ingles (nombres de funciones/variables)
+- Documentacion tecnica en ingles, reglas de negocio en espanol
 - Docstrings estilo Google
-- `core/` no depende de Django
-- Django Models con `verbose_name` en espanol (cuando se agreguen modelos)
-- ETL con manejo explicito de errores
+- `core/` nunca importa Django
+- Type hints en todas las firmas publicas
+- ETL con manejo explicito de errores y logging
 
 ## Versionado
 
-- Commits atomicos y con Conventional Commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`
-- No subir secretos (`.env`, credenciales)
+- Commits atomicos con [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`
+- No se commitean secretos (`.env`, credenciales)
+- Tags semanticos: `v1.0.0`
 
-## Licencia
+## Autor
 
-Pendiente.
+**Pablo Salamone** — Master en Desarrollo con IA, BIG School (2025-2026)
+
+---
+
+*Proyecto academico. Datos operativos reales de Linea Roca (Trenes Argentinos) utilizados con fines de desarrollo y demostracion.*

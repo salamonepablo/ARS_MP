@@ -150,14 +150,14 @@ docs/legacy_bd/Access20/
 !docs/legacy_bd/README.md
 
 # -----------------------------------------------------------------------------
-# Context prompts and session files (internal use, add at project end if needed)
+# Context prompts (tracked — documents the AI-assisted development process)
 # -----------------------------------------------------------------------------
-context/prompts/
 *.png
 *.jpg
 *.jpeg
 *.JPG
 *.PNG
 
-# Keep specific documentation images if needed
+# Allow README screenshots in docs/images/
 !docs/images/
+!docs/images/**

@@ -250,54 +250,31 @@ class TestFallbackBehavior:
         assert len(result) == 111
 
 
+@pytest.mark.integration
 class TestIntegrationWithRealDatabase:
     """
     Integration tests that run against the real Access database.
-    
-    These tests are skipped in CI (when database is not available).
+
+    Excluded from the default test run.  Execute explicitly with:
+        pytest -m integration
     """
 
-    @pytest.fixture
-    def real_connection_available(self):
-        """Check if we can connect to the real database."""
-        try:
-            # Only import if we're running integration tests
-            from dotenv import load_dotenv
-            load_dotenv()
-            return is_access_available()
-        except Exception:
-            return False
-
-    @pytest.mark.skipif(
-        not os.path.exists(REAL_DB_PATH),
-        reason="Access database file not available",
-    )
     def test_can_connect_to_real_database(self):
         """Should be able to connect to the real Access database."""
-        if not is_access_available():
-            pytest.skip("Access connection not available")
-        
         conn = get_access_connection()
         assert conn is not None
         conn.close()
 
-    @pytest.mark.skipif(
-        not os.path.exists(REAL_DB_PATH),
-        reason="Access database file not available",
-    )
     def test_can_extract_modules_from_real_database(self):
         """Should extract module data from real database."""
-        if not is_access_available():
-            pytest.skip("Access connection not available")
-        
         modules = get_modules_from_access()
-        
+
         # Should have modules (exact count may vary)
         assert len(modules) > 0
-        
+
         # All should be ModuleData instances
         assert all(isinstance(m, ModuleData) for m in modules)
-        
+
         # Check we have both fleet types
         fleet_types = {m.fleet_type for m in modules}
         assert "CSR" in fleet_types or "Toshiba" in fleet_types

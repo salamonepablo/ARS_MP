@@ -161,3 +161,7 @@ docs/legacy_bd/Access20/
 # Allow README screenshots in docs/images/
 !docs/images/
 !docs/images/**
+
+# Allow static assets served by Django
+!web/static/images/
+!web/static/images/**

@@ -81,7 +81,7 @@ ARS_MP resuelve esto con un pipeline ETL que normaliza datos legacy y una interf
 | Frontend | Django Templates + HTMX + Alpine.js |
 | Estilos | Tailwind CSS v4 |
 | Contenedores | Docker Compose (PostgreSQL) |
-| Testing | pytest (214 tests) + coverage |
+| Testing | pytest (222 tests) + coverage |
 | Export | openpyxl (Excel con formato) |
 | Control de versiones | Git + GitHub |
 
@@ -111,13 +111,12 @@ ARS_MP/
 │   └── database/          # Modelos Django (StgModulo, StgKilometraje, etc.)
 ├── templates/             # Base templates (navbar, layout)
 ├── theme/                 # Tailwind CSS v4
-├── tests/                 # 214 tests (97% coverage en core/)
+├── tests/                 # 222 tests (97% coverage en core/)
 ├── docs/                  # Documentacion del proyecto
 │   ├── decisions/         # ADRs (Architecture Decision Records)
 │   ├── images/            # Screenshots del README
 │   ├── legacy_bd/         # Archivos legacy de prueba + schema introspection
 │   ├── ai_workflow.md     # Proceso de desarrollo asistido con IA
-│   ├── slides_guion.md    # Guion para la presentacion de slides
 │   ├── CHANGELOG.md       # Historial de cambios (Keep a Changelog)
 │   ├── access_connection.md # Configuracion de conexion Access + troubleshooting
 │   ├── maintenance_cycle.md # Ciclos de mantenimiento y reglas de negocio
@@ -174,8 +173,10 @@ ARS_MP/
 - **Doble-click interactivo**: marca intervención, resetea KM a 0 en esa fila y filas herederas (jerarquía), con propagación en cascada
 - Prorrateo del mes actual según día del mes
 - Columnas sticky (Módulo, Fecha, Ciclo, Umbral) para scroll horizontal
+- **Header sticky vertical**: encabezados de meses visibles al scrollear (`max-h-[75vh]`)
 - Fila resumen por ciclo + fila "Control" de totales
 - Selector de flota (CSR / Toshiba), meses y KM promedio mensual configurables
+- **Modal de Prioridad de Mantenimiento** (`Ctrl+M`): ranking de los top 24 (CSR) o 12 (Toshiba) módulos con más km desde última DA/RG. Doble-click navega al módulo en la grilla; intervenciones marcadas en la grilla se reflejan automáticamente en el modal
 
 ### 5. Exportacion a Excel
 
@@ -284,7 +285,7 @@ py -m pytest -m ""
 ### Resultados actuales
 
 ```
-214 passed, 2 deselected (integration)
+222 passed, 2 deselected (integration)
 core/services/ — 97% coverage
 ```
 
@@ -298,7 +299,7 @@ core/services/ — 97% coverage
 
 | Modulo | Tests | Cobertura |
 |--------|-------|-----------|
-| Grid projection service | 20 | core/services/ 97% |
+| Grid projection service | 28 | core/services/ 97% |
 | Maintenance projection | 31 | |
 | Fleet views | 24 | |
 | PostgreSQL extractor | 26 | |
@@ -314,7 +315,7 @@ core/services/ — 97% coverage
 | `etl/` | Pipeline ETL: extractores (Access, PostgreSQL), transformadores, loaders. |
 | `web/fleet/` | App Django: vistas, templates, URLs, template tags. |
 | `infrastructure/` | Modelos Django (staging tables), integraciones externas. |
-| `tests/` | 214 tests organizados por modulo. |
+| `tests/` | 222 tests organizados por modulo. |
 | `docs/` | Documentacion tecnica en ingles: ADRs, schema legacy, screenshots, CHANGELOG. |
 | `context/` | Reglas de negocio en espanol. |
 | `scripts/` | Utilidades: test de conexion, toggle de path local/remoto. |

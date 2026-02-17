@@ -1,214 +1,172 @@
-# 🤖 Instrucciones para el Asistente de IA - ARS_MP
+# AGENTS.md - ARS_MP (Argentinian Rolling Stock Maintenance Planner)
 
-> **Usa este documento al inicio de cada sesión para dar contexto a la IA sobre el proyecto**
+> Instructions for AI coding agents operating in this repository.
+> Respond in **Spanish**. Write code, variable names, docstrings, and technical docs in **English**.
+> Business rules and context docs go in **Spanish** (in `context/`).
 
----
+## Build & Run Commands
 
-## 📋 Contexto del Proyecto
+```bash
+# Activate virtualenv (Windows)
+.venv\Scripts\activate
 
+# Install dependencies
+pip install -r requirements.txt
+
+# Database (PostgreSQL via Docker on port 5434)
+docker compose up -d
+python manage.py migrate
+
+# Dev server
+python manage.py runserver
+
+# Tailwind CSS (from theme/static_src/)
+npm run dev    # watch mode
+npm run build  # production build
 ```
-Vamos a construir juntos un Sistema de Proyección y Planificación de Mantenimiento Ferroviario para el material rodante argentino, enfocado en ETL de sistemas legacy y visualización de datos.
 
-SOBRE EL PROYECTO:
-- Nombre: "ARS_MP" (Argentinian Rolling Stock Maintenance Planner)
-- Ubicación: C:\Programmes\TFM\ARS_MP
-- Tipo: Herramienta ETL intermedia con interfaz web que permita:
-  - Extraer datos de sistemas legacy (Access .mdb/.accdb, VB6, CSV, Excel)
-  - Transformar y normalizar datos heterogéneos
-  - Visualizar estado de flota con tarjetas por unidad
-  - Proyectar kilometrajes y ciclos de mantenimiento
-  - Generar grillas tipo Excel con proyecciones
-  - Exportar reportes para integración futura con sistema Laravel corporativo
+## Test Commands
 
-STACK TECNOLÓGICO:
-- Lenguaje: Python 3.11+
-- Framework Web: Django 5.0+
-- Base de Datos: PostgreSQL 15+
-- ETL: pandas, openpyxl, pyodbc/sqlalchemy-access
-- Frontend: Django Templates + HTMX + Alpine.js (interactividad ligera)
-- Estilos: Tailwind CSS
-- Contenedores: Docker + Docker Compose
-- Testing: pytest + coverage
-- Security (Tokens, siempre que sea posible similar al que usan en el sistema
-  corporativo, si no, Password validation, Env)
-- Observabilidad: Sentry (opcional, siempre que se pueda con capa gratuita)
-- Quality Gates (Husky, lo mismo que Sentry)
-- Documentación: Markdown + Sphinx
+```bash
+# Run all unit tests (excludes @pytest.mark.integration by default)
+pytest
 
-ARQUITECTURA DEL PROYECTO:
+# Run a single test file
+pytest tests/test_grid_projection.py
+
+# Run a single test class
+pytest tests/core/domain/entities/test_coach.py::TestCoachCreation
+
+# Run a single test function
+pytest tests/core/domain/entities/test_coach.py::TestCoachCreation::test_create_motor_coach_csr
+
+# Run tests with coverage (minimum 80% on core/)
+pytest --cov=core --cov=etl
+
+# Run integration tests (requires Access DB connection)
+pytest -m integration
+
+# Run only unit tests (default behavior, explicit)
+pytest -m "not integration"
+
+# Verbose with short tracebacks (already in pytest.ini defaults)
+pytest -v --tb=short
+```
+
+**pytest.ini config**: `DJANGO_SETTINGS_MODULE=config.settings`, test discovery in `tests/`, pattern `test_*.py`, classes `Test*`, functions `test_*`.
+
+## Project Architecture
+
 ```
 ARS_MP/
-├── core/              # Dominio y lógica de negocio (PURO Python)
-│   ├── domain/        # Entidades, value objects
-│   ├── services/      # Lógica de proyección, cálculos
-│   └── interfaces/    # Contratos/abstracciones
-├── etl/               # Extractores y transformadores
-│   ├── extractors/    # Conectores Access, CSV, Excel
-│   ├── transformers/  # Limpieza, normalización
-│   └── loaders/       # Carga a PostgreSQL
-├── web/               # Django apps
-│   ├── fleet/         # Gestión de flota (tarjetas, estado)
-│   ├── projections/   # Proyecciones y grillas
-│   ├── reports/       # Generación de reportes
-│   └── api/          # API REST para integración futura
-├── infrastructure/    # Implementaciones concretas
-│   ├── database/     # Modelos Django, migraciones
-│   └── external/     # Integraciones externas
-├── tests/            # Tests organizados por módulo
-├── docs/             # Documentación técnica y de negocio
-└── context/          # Reglas de negocio y particularidades (.md)
+├── core/                  # Pure Python domain (NO Django imports allowed)
+│   ├── domain/entities/   # @dataclass entities: Coach, EMU, Formation, EmuConfiguration
+│   ├── domain/value_objects/  # Enums: UnitType, CoachType
+│   ├── services/          # Stateless services (all @staticmethod)
+│   └── interfaces/        # Abstract contracts (reserved)
+├── etl/extractors/        # Access/Postgres data extraction
+├── infrastructure/
+│   ├── database/models.py     # Django ORM models (domain + staging)
+│   ├── database/repositories.py  # Repository pattern (model<->entity conversion)
+│   └── database/management/commands/  # sync_access command
+├── web/fleet/             # Django views, templates, URLs
+├── config/                # Django project: settings.py, urls.py
+├── tests/                 # Mirrors source structure
+└── docs/, context/        # Technical docs (EN) and business rules (ES)
 ```
 
-METODOLOGÍA DE TRABAJO:
+**Dependency rule**: `core/` -> nothing | `infrastructure/` -> `core/` + Django | `etl/` -> `core/` + `infrastructure/` | `web/` -> all
 
-1. Clean Architecture + DDD simplificado:
-   - core/ NO depende de Django ni de infraestructura
-   - Lógica de negocio independiente del framework
-   - Inyección de dependencias cuando sea necesario
+## Code Style
 
-2. TDD pragmático:
-   - Tests para lógica crítica de negocio PRIMERO
-   - Tests de integración para ETL
-   - Coverage mínimo 80% en core/
+### Imports
+Three groups separated by blank lines: (1) stdlib, (2) third-party, (3) local project.
+Use relative imports within the same package (`from .module import X`).
+Use absolute imports across packages (`from core.domain.entities.coach import Coach`).
+Use `TYPE_CHECKING` guard for circular import avoidance in domain entities.
 
-3. Desarrollo iterativo:
-   - Implementar feature completa (ETL → Modelo → Vista)
-   - Verificar con datos reales de prueba
-   - Documentar decisiones técnicas
+### Type Hints
+- Required on all function signatures (parameters + return type).
+- Prefer modern syntax in `core/`: `int | None`, `list[str]`, `dict[str, Any]`.
+- `Optional[X]` is acceptable in `etl/` and `infrastructure/` layers.
+- Use `Literal["CSR", "Toshiba"]` for constrained string values.
+- Use `from __future__ import annotations` in service files for forward refs.
 
-4. Principios SOLID:
-   - Single Responsibility en cada módulo
-   - Open/Closed para extensiones ETL
-   - Dependency Inversion entre capas
+### Docstrings (Google format)
+```python
+def project_next_intervention(fleet_type: Literal["CSR", "Toshiba"], km_total: int) -> ProjectionResult | None:
+    """Calculate the next maintenance intervention.
 
-MI ROL COMO DESARROLLADOR:
-- Te daré CONTEXTO sobre el negocio ferroviario
-- Te especificaré REQUISITOS funcionales
-- Ejecutaré y validaré el código
-- Te proporcionaré muestras de datos legacy
+    Args:
+        fleet_type: "CSR" or "Toshiba".
+        km_total: Current total accumulated km.
 
-TU ROL COMO ASISTENTE:
-- Actuar como desarrollador senior Python/Django
-- Proponer soluciones PRAGMÁTICAS (que funcionen hoy)
-- Generar código LIMPIO y DOCUMENTADO
-- Alertar sobre posibles problemas con datos legacy
-- Sugerir mejoras arquitecturales cuando corresponda
-- Responder SIEMPRE en ESPAÑOL
+    Returns:
+        ProjectionResult for the soonest-expiring cycle, or None if no data.
 
-DOCUMENTACIÓN Y VERSIONADO (OBLIGATORIO):
-
-- Documentar cada feature implementada en `docs/` siguiendo buenas prácticas:
-   - Decisiones técnicas (qué/por qué/cómo) en inglés.
-   - Reglas/criterios de negocio en español (idealmente en `context/`).
-   - Incluir ejemplos de uso/comandos y supuestos.
-- Mantener el versionado y el historial del repo claros:
-   - Usar mensajes de commit tipo Conventional Commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`.
-   - Commits pequeños y atómicos (una intención principal por commit).
-   - Cuando haya un hito funcional, crear tag (por ejemplo `v0.1.0`) y actualizar un changelog (si existe, si no existe crealo).
-   - Nunca commitear secretos (`.env`, credenciales, tokens).
-
-REGLAS DE CÓDIGO:
-- Python 3.11+ con type hints
-- Docstrings en formato Google
-- Django Models con verbose_name en español
-- Nombres de variables/funciones en inglés
-- Comentarios y documentación técnica en inglés (documentación de negocio en español)
-- SQL queries optimizadas (select_related, prefetch_related)
-- Manejo explícito de errores en ETL
-
-COMANDOS FRECUENTES:
-- Ejecutar tests: `pytest`
-- Coverage: `pytest --cov=core --cov=etl`
-- Migraciones: `python manage.py makemigrations && python manage.py migrate`
-- Servidor dev: `python manage.py runserver`
-- ETL manual: `python manage.py run_etl --source=access --file=path.mdb`
-
-¿Entendido? Confirma y comenzamos con el primer paso.
+    Raises:
+        ValueError: If fleet_type is not recognized.
+    """
 ```
+- Every module file gets a module-level docstring.
+- Test docstrings are written in **Spanish** (business context).
 
----
+### Naming Conventions
+| Element           | Convention        | Example                              |
+|-------------------|-------------------|--------------------------------------|
+| Classes           | PascalCase        | `Coach`, `EmuModel`, `StgModulo`     |
+| Functions/methods | snake_case        | `get_modules_from_access()`          |
+| Private helpers   | `_` prefix        | `_validate()`, `_parse_date()`       |
+| Constants         | UPPER_SNAKE_CASE  | `AVG_DAILY_KM`, `CSR_MAINTENANCE_CYCLES` |
+| Enums             | PascalCase class, UPPER values | `UnitType.COACH`        |
+| Django models     | `Model` suffix (domain), `Stg` prefix (staging) | `EmuModel`, `StgKilometraje` |
+| DB tables         | snake_case        | `fleet_emu`, `stg_modulo`            |
 
-## 📝 Versión Corta (para recordar en sesión)
+### Django Models
+- UUID primary keys (`models.UUIDField(primary_key=True, default=uuid.uuid4)`).
+- `verbose_name` in **Spanish** on every field.
+- `Meta` class on every model with `db_table`, `verbose_name`, `ordering`.
+- `__str__` on every model.
+- Auto-timestamps: `created_at = DateTimeField(auto_now_add=True)`, `updated_at = DateTimeField(auto_now=True)`.
+- Staging models use `UniqueConstraint` and `Index` in Meta.
 
-```
-Recuerda - ARS_MP:
-- Python + Django + PostgreSQL
-- ETL de Access/Excel/CSV → PostgreSQL
-- core/ = lógica pura | etl/ = extractores | web/ = Django
-- Tests en lógica crítica (proyecciones, cálculos)
-- Respuestas en español, código en inglés
-```
+### Domain Entities
+- Pure `@dataclass(kw_only=True)` with no Django dependencies.
+- Self-validating via `__post_init__` -> `_validate()`.
+- Use `@dataclass(frozen=True)` for immutable value objects.
+- Abstract base: `MaintenanceUnit(ABC)` with abstract `get_unit_type()`.
 
----
+### Error Handling
+- Domain validation: raise `ValueError` with descriptive messages.
+- Infrastructure: custom exceptions (e.g., `AccessConnectionError`) with `from e` chaining.
+- ETL: tiered fallback pattern (Postgres -> Access ODBC -> stub data) with logging at each level.
+- Use `logger.warning()` for recoverable fallbacks, `logger.error()` for unexpected failures.
+- Always close connections in `finally` blocks.
 
-## 🔄 Para Retomar una Sesión
+### Logging
+- Module-level: `logger = logging.getLogger(__name__)`.
+- Three configured loggers: `etl`, `core`, `web` (levels via env vars).
+- Use %-formatting for lazy evaluation: `logger.warning("Failed: %s", error)`.
 
-```
-Continuamos con ARS_MP.
+### Tests
+- Mirror source structure under `tests/`.
+- Group related tests in `Test*` classes with descriptive docstrings (Spanish).
+- Use `conftest.py` for fixtures and factory functions.
+- Mark Django DB tests with `@pytest.mark.django_db`.
+- Mark Access DB tests with `@pytest.mark.integration`.
+- Use `unittest.mock.patch` for external dependency mocking.
 
-Estado actual:
-- Módulos completados: [listar]
-- ETL funcionando para: [Access | CSV | Excel]
-- Vistas implementadas: [listar]
-- Tests: [N] unitarios + [M] integración
+## Git & Documentation
 
-Vamos a continuar con [siguiente tarea].
+- **Commits**: Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`). Small, atomic.
+- **Never commit**: `.env`, credentials, `*.mdb`, `*.accdb`, `db.sqlite3`.
+- **Tags**: semantic versioning (`v1.0.0`). Update `docs/CHANGELOG.md` at milestones.
+- **Technical docs**: English, in `docs/`. ADRs in `docs/decisions/`.
+- **Business docs**: Spanish, in `context/`.
 
-Contexto pendiente:
-- [Problema o feature a resolver]
-- [Datos de prueba disponibles]
+## Environment
 
-Mantenemos arquitectura: core/ → etl/ → web/
-```
-
----
-
-## 📚 Documentación de Negocio
-
-ARS_MP/
-├── docs/             # Documentación técnica y de negocio
-│   ├── maintenance_cycle.md
-│   ├── PLAN DE MANTENIMIENTO 2026 - LGR - CNRT v3.xlsx
-│   └── legacy_bd/    # Fuentes de datos legacy (archivos de prueba)
-└── context/          # Reglas de negocio y particularidades (.md) (pendiente)
-
-
-### Fuentes de Datos Legacy
-
-ARS_MP/
-├── docs/
-│   ├── maintenance_cycle.md  # Ciclos de mantenimiento por flota
-│   └── legacy_bd/
-│       ├── Accdb/
-│       │   ├── CSR_Kms_MantEvents.xlsx
-│       │   ├── CSR_LecturasKms.csv
-│       │   ├── CSR_MantEvents.csv
-│       │   ├── CSR_Modulos.csv
-│       │   └── DB_CCEE_Programación 1.1.accdb
-│       └── Access20/
-│           ├── baseCCEE.mdb
-│           ├── baseCCRR.mdb
-│           └── baseLocs.mdb
-└── context/          # Reglas de negocio y particularidades (.md)
-
-- **Access .mdb (VB6)**: Sistema actual Legacy Since 1990
-- **Access .accdb**: Sistema actual 2015-presente
-- **CSV/Excel**: Reportes manuales de talleres
-- **Sistema PHP/Laravel**: Futuro punto de integración (sin acceso actual)
-
----
-
-## ✅ Checklist de Inicio
-
-Antes de comenzar, verificar:
-
-- [ ] Python 3.11+ instalado
-- [ ] PostgreSQL 15+ funcionando
-- [ ] Entorno virtual creado: `python -m venv .venv`
-- [ ] Dependencias base: `pip install django pandas openpyxl pytest`
-- [ ] Docker Desktop (opcional pero recomendado)
-- [ ] Acceso a archivos .mdb/.accdb de prueba
-- [ ] Carpeta `C:\Programmes\TFM\ARS_MP` creada
-
----
-
+- **Python**: 3.11+ | **Django**: 5.0+ | **PostgreSQL**: 15+ (Docker, port 5434)
+- **Settings**: single `config/settings.py`, configured via env vars (see `.env.example`)
+- **DB toggle**: set `DJANGO_DB_ENGINE=postgres` for PostgreSQL, unset for SQLite fallback
+- **Access DB**: path in `LEGACY_ACCESS_DB_PATH` env var, requires ODBC driver

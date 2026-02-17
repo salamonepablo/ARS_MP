@@ -34,7 +34,7 @@ py manage.py migrate
 
 ## Notes
 
-- The database persists in a local Docker volume: `ars_mp_postgres_data`.
+- The database persists in a local Docker volume: `ars_mp_postgres`.
 - For CI or local runs without Docker, SQLite remains the default.
 
 ## Quick table inspection from Docker Desktop terminal

@@ -4,7 +4,8 @@
 {% block title %}Man. Planner - {{ fleet_type }}{% endblock %}
 
 {% block content %}
-<div x-data="projectionGrid()" x-init="init()">
+<div x-data="projectionGrid()" x-init="init()"
+     @keydown.window="if (event.ctrlKey && event.key === 'm') { event.preventDefault(); showRanking = !showRanking }">
 
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
@@ -69,12 +70,82 @@
                     class="px-4 py-2 bg-white text-ta-600 border border-ta-300 rounded-lg hover:bg-ta-50 transition-colors text-sm font-medium">
                 Exportar a Excel
             </button>
+
+            <!-- Maintenance Priority Ranking (Ctrl+M) -->
+            <button type="button" @click="showRanking = true"
+                    title="Ctrl+M"
+                    class="px-4 py-2 bg-white text-amber-700 border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors text-sm font-medium">
+                Prioridad Mant. <kbd class="ml-1 px-1 py-0.5 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-500 font-mono">Ctrl+M</kbd>
+            </button>
         </form>
     </div>
 
+    <!-- Ranking Modal -->
+    <template x-if="showRanking">
+        <div class="fixed inset-0 z-50 flex items-center justify-center" @keydown.escape.window="showRanking = false">
+            <!-- Backdrop -->
+            <div class="absolute inset-0 bg-black/40" @click="showRanking = false"></div>
+            <!-- Modal panel -->
+            <div class="relative bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+                <!-- Header -->
+                <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-800">Prioridad de Mantenimiento</h2>
+                        <p class="text-xs text-gray-500">
+                            Top {% if fleet_type == "CSR" %}24{% else %}12{% endif %} modulos ordenados por km desde {{ ranking_top_cycle }}
+                            &mdash; doble click para ir al modulo en la grilla
+                        </p>
+                    </div>
+                    <button @click="showRanking = false"
+                            class="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none">&times;</button>
+                </div>
+                <!-- Table -->
+                <div class="overflow-y-auto flex-1 px-2 py-2">
+                    <table class="w-full text-xs">
+                        <thead class="sticky top-0 bg-gray-50">
+                            <tr>
+                                <th class="px-2 py-2 text-center text-gray-500 font-semibold">#</th>
+                                <th class="px-3 py-2 text-left text-gray-500 font-semibold">Modulo</th>
+                                <th class="px-3 py-2 text-right text-gray-500 font-semibold">Km desde {{ ranking_top_cycle }}</th>
+                                <th class="px-3 py-2 text-center text-gray-500 font-semibold">Fecha Ref.</th>
+                                <th class="px-3 py-2 text-left text-gray-500 font-semibold">Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="entry in rankingData" :key="entry.module_id">
+                                <tr class="border-b border-gray-100 cursor-pointer transition-colors"
+                                    :class="selectedModules[entry.module_id]
+                                        ? 'bg-green-100 hover:bg-green-200'
+                                        : 'hover:bg-blue-50'"
+                                    @dblclick="selectRankingModule(entry)">
+                                    <td class="px-2 py-2 text-center text-gray-400 font-mono" x-text="entry.rank"></td>
+                                    <td class="px-3 py-2 font-bold text-gray-900" x-text="entry.module_id"></td>
+                                    <td class="px-3 py-2 text-right font-mono text-gray-700"
+                                        x-text="formatNumber(entry.km_since_reference)"></td>
+                                    <td class="px-3 py-2 text-center text-gray-500"
+                                        x-text="entry.reference_date ? new Date(entry.reference_date + 'T00:00:00').toLocaleDateString('es-AR') : '-'"></td>
+                                    <td class="px-3 py-2 text-gray-500" x-text="entry.reference_type || '-'"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Footer -->
+                <div class="px-5 py-3 border-t border-gray-200 flex items-center justify-between">
+                    <span class="text-xs text-gray-400"
+                          x-text="Object.keys(selectedModules).length + ' modulo(s) seleccionado(s)'"></span>
+                    <button @click="showRanking = false"
+                            class="px-4 py-1.5 bg-ta-600 text-white rounded-lg hover:bg-ta-700 transition-colors text-sm font-medium">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
     <!-- Grid Table -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto overflow-y-auto max-h-[75vh]">
             <table class="min-w-full text-xs">
                 <!-- Header -->
                 <thead class="bg-gray-50 sticky top-0 z-10">
@@ -219,6 +290,12 @@ function projectionGrid() {
         // Track user interventions: { "M01-AN-3": true }  (module-cycle-monthIdx)
         interventions: {},
 
+        // Ranking modal state
+        showRanking: false,
+        rankingData: {{ ranking_json|safe }},
+        selectedModules: {},
+        rankingTopCycle: '{{ ranking_top_cycle }}',
+
         // Hierarchy definitions (higher resets lower)
         hierarchyCSR: ['DA', 'PE', 'BA', 'AN'],
         hierarchyToshiba: ['RG', 'RB'],
@@ -279,6 +356,12 @@ function projectionGrid() {
 
             // Update summary footer counts
             this.updateSummary();
+
+            // Sync ranking modal: if the intervention is on the top cycle
+            // (DA for CSR, RG for Toshiba), update selectedModules
+            if (cycleType === this.rankingTopCycle) {
+                this.syncRankingSelection(moduleId);
+            }
         },
 
         /**
@@ -472,6 +555,54 @@ function projectionGrid() {
 
         formatNumber(num) {
             return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        },
+
+        /**
+         * Sync ranking modal selection state with grid interventions.
+         * Called after every handleDblClick on a top-cycle row.
+         * Checks if the module has ANY active top-cycle intervention
+         * in the grid and updates selectedModules accordingly.
+         */
+        syncRankingSelection(moduleId) {
+            const topCycle = this.rankingTopCycle;
+            const hasIntervention = Object.keys(this.interventions).some(
+                k => k.startsWith(`${moduleId}-${topCycle}-`)
+            );
+            if (hasIntervention) {
+                this.selectedModules[moduleId] = true;
+            } else {
+                delete this.selectedModules[moduleId];
+            }
+        },
+
+        /**
+         * Handle double-click on a ranking modal row.
+         * Scrolls the grid to the module's top-cycle row (DA/RG)
+         * so the analyst can choose the exact month cell to mark.
+         */
+        selectRankingModule(entry) {
+            const moduleId = entry.module_id;
+            const topCycle = this.rankingTopCycle;
+
+            // Find the first cell of this module's top-cycle row in the grid
+            const firstCell = document.querySelector(
+                `td[data-module-id="${moduleId}"][data-cycle-type="${topCycle}"][data-month-idx="0"]`
+            );
+            if (firstCell) {
+                // Close modal, then scroll to the row
+                this.showRanking = false;
+                this.$nextTick(() => {
+                    const row = firstCell.closest('tr');
+                    if (row) {
+                        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        // Brief highlight to draw attention
+                        row.classList.add('ring-2', 'ring-amber-400');
+                        setTimeout(() => {
+                            row.classList.remove('ring-2', 'ring-amber-400');
+                        }, 2000);
+                    }
+                });
+            }
         },
 
         exportExcel() {

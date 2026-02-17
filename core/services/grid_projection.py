@@ -104,6 +104,30 @@ class ModuleGridData:
     cycle_rows: list[CycleRow] = field(default_factory=list)
 
 
+@dataclass
+class ModuleRankingEntry:
+    """A single entry in the maintenance urgency ranking.
+
+    Modules are ranked by km accumulated since their last RG or
+    commissioning date, in descending order (most km = most urgent).
+
+    Attributes:
+        rank: 1-indexed position in the ranking.
+        module_id: Human-readable id (e.g. "M01", "T05").
+        fleet_type: "CSR" or "Toshiba".
+        km_since_reference: Km accumulated since reference event.
+        reference_date: Date of last RG or commissioning.
+        reference_type: "RG" or "Puesta en Servicio".
+    """
+
+    rank: int
+    module_id: str
+    fleet_type: str
+    km_since_reference: int
+    reference_date: date | None
+    reference_type: str
+
+
 # ---------------------------------------------------------------------------
 # Short month labels
 # ---------------------------------------------------------------------------
@@ -283,6 +307,57 @@ class GridProjectionService:
                 reference_date=ref,
             )
             result.append(grid_data)
+
+        return result
+
+    @staticmethod
+    def rank_modules_by_urgency(
+        modules_ranking_data: list[dict],
+        top_n: int = 24,
+    ) -> list[ModuleRankingEntry]:
+        """Rank modules by maintenance urgency (most km since reference first).
+
+        Modules are sorted by ``km_since_reference`` in descending order.
+        Modules without km data (None) are placed last with km_since = 0.
+
+        Args:
+            modules_ranking_data: List of dicts with keys:
+                - module_id (str)
+                - fleet_type (str)
+                - km_since_reference (int | None)
+                - reference_date (date | None)
+                - reference_type (str)
+            top_n: Maximum number of modules to return (default 24).
+
+        Returns:
+            List of ``ModuleRankingEntry`` sorted by urgency, length
+            <= *top_n*.
+        """
+        if not modules_ranking_data:
+            return []
+
+        # Normalise None km to 0 and sort descending
+        def sort_key(m: dict) -> int:
+            km = m.get("km_since_reference")
+            return km if km is not None else 0
+
+        sorted_modules = sorted(
+            modules_ranking_data,
+            key=sort_key,
+            reverse=True,
+        )
+
+        result: list[ModuleRankingEntry] = []
+        for i, mod in enumerate(sorted_modules[:top_n]):
+            km = mod.get("km_since_reference")
+            result.append(ModuleRankingEntry(
+                rank=i + 1,
+                module_id=mod["module_id"],
+                fleet_type=mod["fleet_type"],
+                km_since_reference=km if km is not None else 0,
+                reference_date=mod.get("reference_date"),
+                reference_type=mod.get("reference_type", ""),
+            ))
 
         return result
 

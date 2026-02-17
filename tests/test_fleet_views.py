@@ -21,11 +21,6 @@ class TestModuleListView:
     """Tests for the module_list view."""
 
     @pytest.fixture
-    def client(self):
-        """Provide Django test client."""
-        return Client()
-
-    @pytest.fixture
     def mock_stub_data(self):
         """
         Mock the data source to use stub data.
@@ -39,25 +34,25 @@ class TestModuleListView:
         ):
             yield
 
-    def test_view_returns_200(self, client):
+    def test_view_returns_200(self, authenticated_client, mock_stub_data):
         """Module list view should return HTTP 200."""
-        response = client.get("/fleet/modules/")
+        response = authenticated_client.get("/fleet/modules/")
         assert response.status_code == 200
 
-    def test_view_uses_correct_template(self, client):
+    def test_view_uses_correct_template(self, authenticated_client, mock_stub_data):
         """View should use fleet/module_list.html template."""
-        response = client.get("/fleet/modules/")
+        response = authenticated_client.get("/fleet/modules/")
         assert "fleet/module_list.html" in [t.name for t in response.templates]
 
-    def test_context_contains_modules(self, client, mock_stub_data):
+    def test_context_contains_modules(self, authenticated_client, mock_stub_data):
         """Context should contain 'modules' list with 111 modules (stub data)."""
-        response = client.get("/fleet/modules/")
+        response = authenticated_client.get("/fleet/modules/")
         assert "modules" in response.context
         assert len(response.context["modules"]) == 111
 
-    def test_context_contains_summary(self, client, mock_stub_data):
+    def test_context_contains_summary(self, authenticated_client, mock_stub_data):
         """Context should contain 'summary' dict with KPIs."""
-        response = client.get("/fleet/modules/")
+        response = authenticated_client.get("/fleet/modules/")
         assert "summary" in response.context
         
         summary = response.context["summary"]
@@ -65,15 +60,15 @@ class TestModuleListView:
         assert summary["csr_count"] == 86
         assert summary["toshiba_count"] == 25
 
-    def test_context_contains_fleet_filter(self, client):
+    def test_context_contains_fleet_filter(self, authenticated_client, mock_stub_data):
         """Context should contain current fleet filter value."""
-        response = client.get("/fleet/modules/")
+        response = authenticated_client.get("/fleet/modules/")
         assert "fleet_filter" in response.context
         assert response.context["fleet_filter"] == "all"
 
-    def test_filter_by_csr(self, client, mock_stub_data):
+    def test_filter_by_csr(self, authenticated_client, mock_stub_data):
         """Filtering by CSR should return only CSR modules."""
-        response = client.get("/fleet/modules/?fleet=csr")
+        response = authenticated_client.get("/fleet/modules/?fleet=csr")
         
         assert response.context["fleet_filter"] == "csr"
         modules = response.context["modules"]
@@ -81,9 +76,9 @@ class TestModuleListView:
         for module in modules:
             assert module.fleet_type == "CSR"
 
-    def test_filter_by_toshiba(self, client, mock_stub_data):
+    def test_filter_by_toshiba(self, authenticated_client, mock_stub_data):
         """Filtering by Toshiba should return only Toshiba modules."""
-        response = client.get("/fleet/modules/?fleet=toshiba")
+        response = authenticated_client.get("/fleet/modules/?fleet=toshiba")
         
         assert response.context["fleet_filter"] == "toshiba"
         modules = response.context["modules"]
@@ -91,9 +86,9 @@ class TestModuleListView:
         for module in modules:
             assert module.fleet_type == "Toshiba"
 
-    def test_only_get_method_allowed(self, client):
+    def test_only_get_method_allowed(self, authenticated_client):
         """View should only allow GET requests."""
-        response = client.post("/fleet/modules/")
+        response = authenticated_client.post("/fleet/modules/")
         assert response.status_code == 405  # Method Not Allowed
 
 
@@ -106,22 +101,17 @@ class TestModuleListViewWithRealData:
     without checking specific counts.
     """
 
-    @pytest.fixture
-    def client(self):
-        """Provide Django test client."""
-        return Client()
-
-    def test_view_returns_modules_list(self, client):
+    def test_view_returns_modules_list(self, authenticated_client):
         """View should return a non-empty list of modules."""
-        response = client.get("/fleet/modules/")
+        response = authenticated_client.get("/fleet/modules/")
         modules = response.context["modules"]
         
         # Should have some modules (either from Access or stub)
         assert len(modules) > 0
         
-    def test_all_modules_have_required_attributes(self, client):
+    def test_all_modules_have_required_attributes(self, authenticated_client):
         """All modules should have the required attributes."""
-        response = client.get("/fleet/modules/")
+        response = authenticated_client.get("/fleet/modules/")
         modules = response.context["modules"]
         
         for module in modules:
@@ -130,9 +120,9 @@ class TestModuleListViewWithRealData:
             assert hasattr(module, "km_total_accumulated")
             assert hasattr(module, "last_maintenance_date")
 
-    def test_summary_has_required_keys(self, client):
+    def test_summary_has_required_keys(self, authenticated_client):
         """Summary should contain all required KPI keys."""
-        response = client.get("/fleet/modules/")
+        response = authenticated_client.get("/fleet/modules/")
         summary = response.context["summary"]
         
         required_keys = [
@@ -149,11 +139,6 @@ class TestModuleDetailView:
     """Tests for the module_detail view."""
 
     @pytest.fixture
-    def client(self):
-        """Provide Django test client."""
-        return Client()
-
-    @pytest.fixture
     def mock_stub_data(self):
         """Mock data source to use stub data."""
         with patch(
@@ -162,43 +147,43 @@ class TestModuleDetailView:
         ):
             yield
 
-    def test_detail_returns_200_for_csr(self, client, mock_stub_data):
+    def test_detail_returns_200_for_csr(self, authenticated_client, mock_stub_data):
         """Detail view should return 200 for a valid CSR module."""
-        response = client.get("/fleet/modules/M01/")
+        response = authenticated_client.get("/fleet/modules/M01/")
         assert response.status_code == 200
 
-    def test_detail_returns_200_for_toshiba(self, client, mock_stub_data):
+    def test_detail_returns_200_for_toshiba(self, authenticated_client, mock_stub_data):
         """Detail view should return 200 for a valid Toshiba module."""
-        response = client.get("/fleet/modules/T01/")
+        response = authenticated_client.get("/fleet/modules/T01/")
         assert response.status_code == 200
 
-    def test_detail_returns_404_for_invalid(self, client, mock_stub_data):
+    def test_detail_returns_404_for_invalid(self, authenticated_client, mock_stub_data):
         """Detail view should return 404 for non-existent module."""
-        response = client.get("/fleet/modules/X99/")
+        response = authenticated_client.get("/fleet/modules/X99/")
         assert response.status_code == 404
 
-    def test_detail_case_insensitive(self, client, mock_stub_data):
+    def test_detail_case_insensitive(self, authenticated_client, mock_stub_data):
         """Module ID should be case-insensitive."""
-        response = client.get("/fleet/modules/m01/")
+        response = authenticated_client.get("/fleet/modules/m01/")
         assert response.status_code == 200
 
-    def test_detail_uses_correct_template(self, client, mock_stub_data):
+    def test_detail_uses_correct_template(self, authenticated_client, mock_stub_data):
         """Should use fleet/module_detail.html template."""
-        response = client.get("/fleet/modules/M01/")
+        response = authenticated_client.get("/fleet/modules/M01/")
         template_names = [t.name for t in response.templates]
         assert "fleet/module_detail.html" in template_names
 
-    def test_detail_context_has_module(self, client, mock_stub_data):
+    def test_detail_context_has_module(self, authenticated_client, mock_stub_data):
         """Context should contain the module object."""
-        response = client.get("/fleet/modules/M01/")
+        response = authenticated_client.get("/fleet/modules/M01/")
         assert "module" in response.context
         module = response.context["module"]
         assert module.module_id == "M01"
         assert module.fleet_type == "CSR"
 
-    def test_detail_context_has_projection(self, client, mock_stub_data):
+    def test_detail_context_has_projection(self, authenticated_client, mock_stub_data):
         """Context should contain a projection result."""
-        response = client.get("/fleet/modules/M01/")
+        response = authenticated_client.get("/fleet/modules/M01/")
         assert "projection" in response.context
         projection = response.context["projection"]
         # With stub data, projection should be computed
@@ -207,41 +192,41 @@ class TestModuleDetailView:
         assert hasattr(projection, "km_remaining")
         assert hasattr(projection, "estimated_date")
 
-    def test_detail_context_has_module_options(self, client, mock_stub_data):
+    def test_detail_context_has_module_options(self, authenticated_client, mock_stub_data):
         """Context should contain module_options for the dropdown."""
-        response = client.get("/fleet/modules/M01/")
+        response = authenticated_client.get("/fleet/modules/M01/")
         assert "module_options" in response.context
         options = response.context["module_options"]
         assert len(options) == 111  # 86 CSR + 25 Toshiba
 
-    def test_detail_module_has_key_data(self, client, mock_stub_data):
+    def test_detail_module_has_key_data(self, authenticated_client, mock_stub_data):
         """Module should have maintenance_key_data populated."""
-        response = client.get("/fleet/modules/M01/")
+        response = authenticated_client.get("/fleet/modules/M01/")
         module = response.context["module"]
         assert len(module.maintenance_key_data) > 0
         # CSR should have 4 cycle types
         assert len(module.maintenance_key_data) == 4
 
-    def test_detail_toshiba_has_key_data(self, client, mock_stub_data):
+    def test_detail_toshiba_has_key_data(self, authenticated_client, mock_stub_data):
         """Toshiba module should have 2 key data entries (RB, RG)."""
-        response = client.get("/fleet/modules/T01/")
+        response = authenticated_client.get("/fleet/modules/T01/")
         module = response.context["module"]
         assert len(module.maintenance_key_data) == 2
 
-    def test_detail_module_has_history(self, client, mock_stub_data):
+    def test_detail_module_has_history(self, authenticated_client, mock_stub_data):
         """Module should have maintenance_history populated."""
-        response = client.get("/fleet/modules/M01/")
+        response = authenticated_client.get("/fleet/modules/M01/")
         module = response.context["module"]
         assert len(module.maintenance_history) > 0
 
-    def test_detail_context_has_data_source(self, client, mock_stub_data):
+    def test_detail_context_has_data_source(self, authenticated_client, mock_stub_data):
         """Context should contain data_source indicator."""
-        response = client.get("/fleet/modules/M01/")
+        response = authenticated_client.get("/fleet/modules/M01/")
         assert "data_source" in response.context
         # With stub data, module_db_id is None, so source is STUB
         assert response.context["data_source"] == "STUB"
 
-    def test_detail_only_get_allowed(self, client):
+    def test_detail_only_get_allowed(self, authenticated_client):
         """Detail view should only allow GET requests."""
-        response = client.post("/fleet/modules/M01/")
+        response = authenticated_client.post("/fleet/modules/M01/")
         assert response.status_code == 405

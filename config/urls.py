@@ -3,11 +3,15 @@ URL configuration for ARS_MP project.
 """
 
 from django.contrib import admin
+from django.contrib.auth import views as auth_views
 from django.shortcuts import redirect
 from django.urls import include, path
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Authentication
+    path("accounts/", include("django.contrib.auth.urls")),
+    # Fleet app
     path("fleet/", include("web.fleet.urls")),
     path("__reload__/", include("django_browser_reload.urls")),
     # Redirect root to fleet modules

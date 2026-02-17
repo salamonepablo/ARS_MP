@@ -19,11 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Sticky grid header**: month column headers now remain visible when scrolling vertically (`max-h-[75vh]` scroll container)
 
-- **AGENTS.md**: rewritten with concise build/test/lint commands, code style guidelines, and project architecture reference for AI coding agents
+- **Login & Authentication**:
+  - Django built-in auth with Argon2 password hashing (`argon2-cffi`)
+  - `@login_required` on all 6 fleet views (module list, module detail, projection grid, export, sync status, root redirect)
+  - Login page with Trenes Argentinos branding at `/accounts/login/`
+  - Logout button in navbar showing current username
+  - 14 new tests: redirect checks, login/logout flow, password hashing verification
+
+- **AGENTS.md**: rewritten with concise build/test commands, code style guidelines, and project architecture reference for AI coding agents
 
 ### Changed
 
 - Grid projection tests: 28 tests (was 20), added 8 tests for `TestRankModulesByUrgency`
+- Fleet view tests: all 24 tests updated to use `authenticated_client` fixture
 
 ## [1.0.0] - 2026-02-12
 

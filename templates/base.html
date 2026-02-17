@@ -78,11 +78,24 @@
                         <img src="{% static 'images/LogoTAO.jpg' %}" alt="Trenes Argentinos" class="h-10">
                     </a>
                 </div>
-                <div class="flex items-center">
+                <div class="flex items-center gap-4">
                     <a href="{% url 'fleet:module_list' %}" class="text-right">
                         <span class="font-semibold text-lg text-ta-700">Maintenance Planner</span>
                         <span class="block text-xs text-ta-400">Linea Roca</span>
                     </a>
+                    {% if user.is_authenticated %}
+                    <div class="flex items-center gap-2 ml-4 pl-4 border-l border-gray-200">
+                        <span class="text-xs text-gray-500">{{ user.username }}</span>
+                        <form method="post" action="{% url 'logout' %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    class="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                                    title="Cerrar sesion">
+                                Salir
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

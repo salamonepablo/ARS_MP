@@ -7,6 +7,9 @@ psycopg[binary]>=3.2,<4.0
 # Environment and config
 python-dotenv>=1.0,<2.0
 
+# Security (password hashing)
+argon2-cffi>=23.1,<24.0
+
 # Frontend (Tailwind CSS)
 django-tailwind>=4.0,<5.0
 django-browser-reload>=1.0,<2.0

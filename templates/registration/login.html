@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - ARS Maintenance Planner</title>
+
+    <!-- Tailwind CSS (CDN for development) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'ta': {
+                            50: '#e6f7ff',
+                            100: '#b3e6ff',
+                            200: '#80d4ff',
+                            300: '#4dc3ff',
+                            400: '#1ab2ff',
+                            500: '#00A3E0',
+                            600: '#0082b3',
+                            700: '#006186',
+                            800: '#004159',
+                            900: '#00202c',
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+
+    {% load static %}
+
+    <!-- Inter font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="min-h-screen bg-ta-50 flex items-center justify-center font-[Inter]">
+
+    <div class="w-full max-w-md mx-4">
+        <!-- Logo + Title -->
+        <div class="text-center mb-8">
+            <img src="{% static 'images/LogoTAO.jpg' %}" alt="Trenes Argentinos" class="h-16 mx-auto mb-4">
+            <h1 class="text-2xl font-bold text-ta-700">Maintenance Planner</h1>
+            <p class="text-sm text-ta-400 mt-1">Linea Roca</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-8">
+            <h2 class="text-lg font-semibold text-gray-800 mb-6">Iniciar sesion</h2>
+
+            {% if form.errors %}
+            <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p class="text-sm text-red-700 font-medium">Usuario o contrasena incorrectos.</p>
+            </div>
+            {% endif %}
+
+            <form method="post" action="{% url 'login' %}">
+                {% csrf_token %}
+
+                <!-- Username -->
+                <div class="mb-4">
+                    <label for="id_username" class="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+                    <input type="text" name="username" id="id_username" autofocus
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ta-400 focus:border-ta-400 outline-none transition-colors text-sm"
+                           placeholder="nombre.apellido"
+                           value="{{ form.username.value|default:'' }}">
+                </div>
+
+                <!-- Password -->
+                <div class="mb-6">
+                    <label for="id_password" class="block text-sm font-medium text-gray-700 mb-1">Contrasena</label>
+                    <input type="password" name="password" id="id_password"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ta-400 focus:border-ta-400 outline-none transition-colors text-sm"
+                           placeholder="********">
+                </div>
+
+                <input type="hidden" name="next" value="{{ next }}">
+
+                <!-- Submit -->
+                <button type="submit"
+                        class="w-full py-2.5 bg-ta-500 text-white rounded-lg hover:bg-ta-600 transition-colors text-sm font-semibold">
+                    Ingresar
+                </button>
+            </form>
+        </div>
+
+        <!-- Footer -->
+        <p class="text-center text-xs text-gray-400 mt-6">
+            Trenes Argentinos Operaciones &mdash; Sistema de uso interno
+        </p>
+    </div>
+
+</body>
+</html>

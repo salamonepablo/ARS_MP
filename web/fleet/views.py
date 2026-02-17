@@ -10,6 +10,7 @@ import logging
 import subprocess
 import sys
 
+from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
@@ -43,6 +44,7 @@ from .stub_data import get_fleet_summary
 logger = logging.getLogger(__name__)
 
 
+@login_required
 @require_GET
 def module_list(request):
     """
@@ -79,6 +81,7 @@ def module_list(request):
     return render(request, "fleet/module_list.html", context)
 
 
+@login_required
 @require_GET
 def module_detail(request, module_id: str):
     """
@@ -183,6 +186,7 @@ def module_detail(request, module_id: str):
 # Sync Access → Postgres
 # ---------------------------------------------------------------------------
 
+@login_required
 @require_GET
 def sync_status(request):
     """
@@ -215,6 +219,7 @@ def sync_status(request):
     })
 
 
+@login_required
 @require_POST
 def sync_trigger(request):
     """
@@ -267,6 +272,7 @@ def sync_trigger(request):
 # Maintenance Planner (projection grid)
 # ---------------------------------------------------------------------------
 
+@login_required
 @require_GET
 def projection_grid(request):
     """
@@ -421,6 +427,7 @@ def projection_grid(request):
     return render(request, "fleet/projection_grid.html", context)
 
 
+@login_required
 @require_GET
 def projection_export(request):
     """

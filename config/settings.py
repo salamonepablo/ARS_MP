@@ -64,11 +64,14 @@ INSTALLED_APPS = [
     # Third-party
     "tailwind",
     "theme",
-    "django_browser_reload",
     # Project apps
     "web.fleet",
     "infrastructure.database",
 ]
+
+# Only enable browser reload in development
+if DEBUG and not os.getenv("RAILWAY_ENVIRONMENT"):
+    INSTALLED_APPS.append("django_browser_reload")
 
 # Tailwind CSS configuration
 TAILWIND_APP_NAME = "theme"
@@ -85,8 +88,11 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "django_browser_reload.middleware.BrowserReloadMiddleware",
 ]
+
+# Only enable browser reload middleware in development
+if DEBUG and not os.getenv("RAILWAY_ENVIRONMENT"):
+    MIDDLEWARE.append("django_browser_reload.middleware.BrowserReloadMiddleware")
 
 ROOT_URLCONF = "config.urls"
 

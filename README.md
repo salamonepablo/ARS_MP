@@ -80,7 +80,7 @@ ARS_MP resuelve esto con un pipeline ETL que normaliza datos legacy y una interf
 | Frontend | Django Templates + HTMX + Alpine.js |
 | Estilos | Tailwind CSS v4 |
 | Contenedores | Docker Compose (PostgreSQL) |
-| Testing | pytest (235 tests) + coverage |
+| Testing | pytest (248 tests) + coverage |
 | Export | openpyxl (Excel con formato) |
 | Control de versiones | Git + GitHub |
 
@@ -110,7 +110,7 @@ ARS_MP/
 │   └── database/          # Modelos Django (StgModulo, StgKilometraje, etc.)
 ├── templates/             # Base templates (navbar, layout)
 ├── theme/                 # Tailwind CSS v4
-├── tests/                 # 235 tests (97% coverage en core/)
+├── tests/                 # 248 tests (97% coverage en core/)
 ├── docs/                  # Documentacion del proyecto
 │   ├── decisions/         # ADRs (Architecture Decision Records)
 │   ├── images/            # Screenshots del README
@@ -313,7 +313,7 @@ py -m pytest -m ""
 ### Resultados actuales
 
 ```
-235 passed, 2 deselected (integration)
+248 passed, 2 deselected (integration)
 core/services/ — 97% coverage
 ```
 
@@ -335,6 +335,7 @@ core/services/ — 97% coverage
 | Access connection | 17 | |
 | Stub data | 22 | |
 | Domain entities | 74 | |
+| Reference data | 13 | |
 
 ## Estructura del proyecto
 
@@ -344,7 +345,7 @@ core/services/ — 97% coverage
 | `etl/` | Pipeline ETL: extractores (Access, PostgreSQL), transformadores, loaders. |
 | `web/fleet/` | App Django: vistas, templates, URLs, template tags. |
 | `infrastructure/` | Modelos Django (staging tables), integraciones externas. |
-| `tests/` | 235 tests organizados por modulo. |
+| `tests/` | 248 tests organizados por modulo. |
 | `docs/` | Documentacion tecnica en ingles: ADRs, schema legacy, screenshots, CHANGELOG. |
 | `context/` | Reglas de negocio en espanol. |
 | `scripts/` | Utilidades: test de conexion, toggle de path local/remoto. |

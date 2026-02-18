@@ -237,7 +237,18 @@ La variable `LEGACY_ACCESS_DB_PATH` admite dos configuraciones segun el entorno:
 | **Corporativo (Trenes Argentinos)** | Ruta al disco de red de la empresa (ej. `\\servidor\ruta\DB_CCEE_Programacion 1.1.accdb`) |
 | **Evaluacion academica / desarrollo local** | `docs/legacy_bd/Accdb/DB_CCEE_Programación 1.1.accdb` (valor por defecto en `.env.example`) |
 
-> **Para evaluadores del TFM**: la base de datos Access con datos reales esta disponible para descarga en [Google Drive](https://drive.google.com/drive/folders/1AcMTlrkN62W718JknnJeKEjRkT8h29bI?usp=drive_link). Descargar el archivo y copiarlo en `docs/legacy_bd/Accdb/`. Los datos no estaran actualizados al momento de la correccion pero son datos operativos reales de Linea Roca.
+#### Archivos de datos legacy necesarios
+
+La aplicacion lee **2 archivos** de datos legacy en tiempo de ejecucion:
+
+| Archivo | Ubicacion | Incluido en el repo | Proposito |
+|---------|-----------|---------------------|-----------|
+| `DB_CCEE_Programación 1.1.accdb` | `docs/legacy_bd/Accdb/` | No (`.gitignore`, descargar de Drive) | Base de datos Access con modulos, kilometrajes, OTs y coches |
+| `URG-Modulos.csv` | `docs/legacy_bd/Accdb/` | **Si** (incluido en el repo) | Fechas de RG y Puesta en Servicio por modulo — requerido en todos los modos de operacion |
+
+> **Para evaluadores del TFM**: la base de datos Access con datos reales esta disponible para descarga en [Google Drive](https://drive.google.com/drive/folders/1AcMTlrkN62W718JknnJeKEjRkT8h29bI?usp=drive_link). Descargar `DB_CCEE_Programación 1.1.accdb` y copiarlo en `docs/legacy_bd/Accdb/`. El archivo `URG-Modulos.csv` ya viene incluido en el repositorio. Los datos no estaran actualizados al momento de la correccion pero son datos operativos reales de Linea Roca.
+>
+> Sin la base Access, la aplicacion funciona en modo stub (datos generados) pero las proyecciones del Maintenance Planner no tendran datos reales.
 
 ### 4) Levantar PostgreSQL con Docker
 

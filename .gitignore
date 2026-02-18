@@ -139,9 +139,10 @@ package-lock.json
 
 # -----------------------------------------------------------------------------
 # Legacy database files (large files stored externally in Google Drive)
-# See docs/legacy_bd/README.md for download instructions
+# See README for download instructions
 # -----------------------------------------------------------------------------
-docs/legacy_bd/Accdb/
+docs/legacy_bd/Accdb/*
+!docs/legacy_bd/Accdb/URG-Modulos.csv
 docs/legacy_bd/Access20/
 *.mdb
 *.accdb

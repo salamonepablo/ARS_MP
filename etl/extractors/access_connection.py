@@ -3,16 +3,49 @@ Access database connection management.
 
 Provides secure, read-only connections to legacy Access databases.
 All connections are explicitly read-only to prevent accidental modifications.
+
+Note: pyodbc is imported lazily to allow the application to run on systems
+without ODBC drivers (e.g., Railway Linux deployment).
 """
 
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-import pyodbc
+# Lazy import: pyodbc may not be available on all platforms (e.g., Railway Linux)
+# Import only for type hints, actual import happens in functions that need it
+if TYPE_CHECKING:
+    import pyodbc
 
 logger = logging.getLogger(__name__)
+
+# Module-level cache for pyodbc availability
+_pyodbc_module: Optional[Any] = None
+_pyodbc_checked: bool = False
+
+
+def _get_pyodbc() -> Optional[Any]:
+    """
+    Lazily import pyodbc module.
+    
+    Returns:
+        pyodbc module if available, None otherwise.
+    """
+    global _pyodbc_module, _pyodbc_checked
+    
+    if _pyodbc_checked:
+        return _pyodbc_module
+    
+    try:
+        import pyodbc as _pyodbc
+        _pyodbc_module = _pyodbc
+    except ImportError:
+        logger.debug("pyodbc not available - Access database support disabled")
+        _pyodbc_module = None
+    
+    _pyodbc_checked = True
+    return _pyodbc_module
 
 
 class AccessConnectionError(Exception):
@@ -33,6 +66,10 @@ def _get_access_driver() -> Optional[str]:
     Returns:
         Driver name if available, None otherwise.
     """
+    pyodbc = _get_pyodbc()
+    if pyodbc is None:
+        return None
+    
     # Check if user specified a driver
     user_driver = _get_env_var("LEGACY_ACCESS_ODBC_DRIVER")
     if user_driver:
@@ -57,14 +94,20 @@ def is_access_available() -> bool:
     Check if Access database connection is available.
     
     Checks:
-    1. Required environment variables are set (path is required)
-    2. Password is set (required for protected databases)
-    3. Database file exists
-    4. ODBC driver is installed
+    1. pyodbc module is available
+    2. Required environment variables are set (path is required)
+    3. Password is set (required for protected databases)
+    4. Database file exists
+    5. ODBC driver is installed
     
     Returns:
         True if all requirements are met, False otherwise.
     """
+    # Check pyodbc availability first
+    if _get_pyodbc() is None:
+        logger.debug("Access connection not available: pyodbc not installed")
+        return False
+    
     # Check environment variables (only path is required)
     db_path = _get_env_var("LEGACY_ACCESS_DB_PATH")
     
@@ -96,7 +139,7 @@ def is_access_available() -> bool:
     return True
 
 
-def get_access_connection() -> pyodbc.Connection:
+def get_access_connection() -> "pyodbc.Connection":
     """
     Get a read-only connection to the Access database.
     
@@ -110,6 +153,13 @@ def get_access_connection() -> pyodbc.Connection:
     Raises:
         AccessConnectionError: If connection cannot be established
     """
+    pyodbc = _get_pyodbc()
+    if pyodbc is None:
+        raise AccessConnectionError(
+            "pyodbc is not available. Access database support requires pyodbc "
+            "and ODBC drivers, which are not available on this platform."
+        )
+    
     # Get configuration
     db_path = _get_env_var("LEGACY_ACCESS_DB_PATH")
     db_password = _get_env_var("LEGACY_ACCESS_DB_PASSWORD", "")  # Optional

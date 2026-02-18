@@ -72,8 +72,9 @@ class TestAccessConnectionAvailability:
             },
             clear=True,
         ):
-            with patch("etl.extractors.access_connection.pyodbc") as mock_pyodbc:
-                mock_pyodbc.drivers.return_value = ["SQL Server"]  # No Access driver
+            mock_pyodbc = MagicMock()
+            mock_pyodbc.drivers.return_value = ["SQL Server"]  # No Access driver
+            with patch("etl.extractors.access_connection._get_pyodbc", return_value=mock_pyodbc):
                 assert is_access_available() is False
 
 
@@ -114,11 +115,14 @@ class TestAccessConnection:
             },
             clear=True,
         ):
+            # Create a mock pyodbc with a real exception class for Error
+            mock_pyodbc = MagicMock()
+            mock_pyodbc.Error = Exception  # Use real Exception as pyodbc.Error
+            mock_pyodbc.connect.side_effect = Exception("Authentication failed")
             with patch("pathlib.Path.exists", return_value=True):
                 with patch("etl.extractors.access_connection._get_access_driver") as mock_driver:
                     mock_driver.return_value = "Microsoft Access Driver (*.mdb, *.accdb)"
-                    with patch("etl.extractors.access_connection.pyodbc.connect") as mock_connect:
-                        mock_connect.side_effect = Exception("Authentication failed")
+                    with patch("etl.extractors.access_connection._get_pyodbc", return_value=mock_pyodbc):
                         with pytest.raises(AccessConnectionError) as exc_info:
                             get_access_connection()
                         assert "failed" in str(exc_info.value).lower()
@@ -134,11 +138,12 @@ class TestAccessConnection:
             },
             clear=True,
         ):
-            with patch("etl.extractors.access_connection.pyodbc") as mock_pyodbc:
-                with patch("pathlib.Path.exists", return_value=True):
-                    mock_pyodbc.drivers.return_value = ["Microsoft Access Driver (*.mdb, *.accdb)"]
-                    mock_pyodbc.connect.return_value = MagicMock()
-                    
+            mock_pyodbc = MagicMock()
+            mock_pyodbc.drivers.return_value = ["Microsoft Access Driver (*.mdb, *.accdb)"]
+            mock_pyodbc.connect.return_value = MagicMock()
+            
+            with patch("pathlib.Path.exists", return_value=True):
+                with patch("etl.extractors.access_connection._get_pyodbc", return_value=mock_pyodbc):
                     get_access_connection()
                     
                     call_args = mock_pyodbc.connect.call_args[0][0]

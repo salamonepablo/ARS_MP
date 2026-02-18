@@ -6,7 +6,7 @@ Sistema de proyeccion y planificacion de mantenimiento ferroviario para el mater
 
 ## Problema que resuelve
 
-La operadora ferroviaria gestiona **111 modulos** (86 CSR + 25 Toshiba) con sistemas legacy heterogeneos: bases Access (.mdb/.accdb) desde los anos 90, planillas Excel manuales y aplicaciones VB6. No existe una vista unificada que permita:
+La operadora ferroviaria gestiona **111 modulos** (86 CSR + 25 Toshiba) con sistemas legacy heterogeneos: bases Access (.mdb/.accdb) desde los años 90, planillas Excel manuales y aplicaciones VB6. No existe una vista unificada que permita:
 
 - Ver el estado de mantenimiento de toda la flota en un solo lugar
 - Proyectar cuando cada modulo alcanzara su proximo ciclo de mantenimiento pesado
@@ -227,8 +227,17 @@ pip install -r requirements.txt
 
 ```powershell
 cp .env.example .env
-# Editar .env con las credenciales de PostgreSQL
+# Editar .env con las credenciales de PostgreSQL y la ruta a la BD Access
 ```
+
+La variable `LEGACY_ACCESS_DB_PATH` admite dos configuraciones segun el entorno:
+
+| Entorno | Valor de `LEGACY_ACCESS_DB_PATH` |
+|---------|----------------------------------|
+| **Corporativo (Trenes Argentinos)** | Ruta al disco de red de la empresa (ej. `\\servidor\ruta\DB_CCEE_Programacion 1.1.accdb`) |
+| **Evaluacion academica / desarrollo local** | `docs/legacy_bd/Accdb/DB_CCEE_Programación 1.1.accdb` (valor por defecto en `.env.example`) |
+
+> **Para evaluadores del TFM**: la base de datos Access con datos reales esta disponible para descarga en [Google Drive](https://drive.google.com/drive/folders/1AcMTlrkN62W718JknnJeKEjRkT8h29bI?usp=drive_link). Descargar el archivo y copiarlo en `docs/legacy_bd/Accdb/`. Los datos no estaran actualizados al momento de la correccion pero son datos operativos reales de Linea Roca.
 
 ### 4) Levantar PostgreSQL con Docker
 
@@ -356,8 +365,9 @@ TODO: Agregar informacion de despliegue cuando se defina la estrategia.
 
 ## Slides de presentacion
 
-<!-- TODO: Agregar link a Google Slides cuando esten listas -->
-*Pendiente — se agregara el link a la presentacion de Google Slides.*
+La presentacion del TFM esta disponible en el repositorio:
+
+- [`docs/slides/ARS_MP_presentacion.pdf`](docs/slides/ARS_MP_presentacion.pdf)
 
 ## Convenciones de codigo
 

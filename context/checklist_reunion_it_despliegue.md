@@ -53,6 +53,66 @@
 - **Go despliegue centralizado**: hay servidor + red + DB + seguridad mínima aprobada.
 - **Plan B temporal**: operación local controlada por usuario clave, mientras IT habilita infraestructura.
 
+## 8) Alternativa: cloud externo con URL pública (sin costo inicial)
+
+- [ ] ¿IT permite consumo de una URL externa puntual vía proxy corporativo (allowlist por dominio)?
+- [ ] ¿La política corporativa permite que datos operativos salgan a un proveedor externo?
+- [ ] ¿Qué clasificación de datos aplica (interno/confidencial) y qué restricciones impone?
+- [ ] ¿Se requiere contrato/DPA antes de subir datos a un tercero?
+
+### Nota práctica (importante)
+
+- Sí, es **posible** desplegar con costo cero inicial usando free tiers, pero no suele ser apto para producción estable.
+- La mayoría de planes gratuitos tiene límites: suspensión por inactividad, cupos de CPU/RAM, almacenamiento acotado y sin SLA.
+- Para piloto o demo interna puede servir; para operación diaria multiusuario conviene plan pago o infraestructura corporativa.
+- Si se elige esta vía, pedir a IT al menos: allowlist de dominio, validación legal/compliance y criterio de continuidad.
+
+## 9) Paso a paso sugerido para un despliegue Free Tier (piloto)
+
+> Objetivo: tener una URL pública funcional para demo/piloto y validar acceso corporativo por proxy.
+
+### 9.1 Preparación del repositorio (una sola vez)
+
+- [ ] Confirmar que la app arranca localmente con variables de entorno (`DEBUG=False` en despliegue).
+- [ ] Tener `requirements.txt` actualizado y comando de arranque definido.
+- [ ] Definir lista mínima de variables de entorno: `SECRET_KEY`, `ALLOWED_HOSTS`, `DATABASE_URL`, zona horaria, etc.
+- [ ] Verificar que no haya secretos en Git (`.env` fuera del repositorio).
+
+### 9.2 Alta en proveedor PaaS con plan gratuito
+
+- [ ] Elegir un proveedor con soporte Python web + PostgreSQL (o Postgres administrado aparte).
+- [ ] Conectar el repositorio Git al proveedor.
+- [ ] Crear servicio web y configurar:
+  - Build command: instalación de dependencias + tareas de build necesarias.
+  - Start command: `gunicorn config.wsgi:application --bind 0.0.0.0:$PORT`.
+- [ ] Configurar variables de entorno desde panel seguro del proveedor.
+
+### 9.3 Base de datos y migraciones
+
+- [ ] Crear instancia PostgreSQL (free tier/trial o alternativa aprobada).
+- [ ] Copiar cadena de conexión en `DATABASE_URL`.
+- [ ] Ejecutar migraciones en el entorno (`python manage.py migrate`).
+- [ ] Crear usuario administrador (`python manage.py createsuperuser`).
+
+### 9.4 Publicación y prueba funcional
+
+- [ ] Desplegar rama principal y obtener URL pública (ej: `https://ars-mp-demo.<proveedor>.com`).
+- [ ] Probar login, vistas principales y flujo ETL mínimo con datos de prueba.
+- [ ] Verificar logs de aplicación para errores de arranque/conexión DB.
+
+### 9.5 Habilitación corporativa
+
+- [ ] Pasar a IT: dominio exacto a permitir por proxy + puertos HTTPS requeridos.
+- [ ] Solicitar confirmación de allowlist para usuarios de la red corporativa.
+- [ ] Validar acceso desde al menos 2 PCs corporativas distintas.
+
+### 9.6 Operación mínima durante piloto
+
+- [ ] Definir responsable de reinicios/deploys y revisión de logs semanal.
+- [ ] Acordar backup básico de DB (export diario/semanal según criticidad).
+- [ ] Documentar límites esperables del free tier: cold start, suspensión por inactividad, cuota mensual.
+- [ ] Definir criterio de salida a plan pago o migración a infraestructura corporativa.
+
 ---
 
 ## Mini resumen para dirección (1 minuto)

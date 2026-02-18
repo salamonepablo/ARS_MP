@@ -5,13 +5,11 @@ Extracts module data from legacy Access database and converts
 to ModuleData objects for the web interface.
 """
 
-import csv
 import logging
 import os
 import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from pathlib import Path
 from typing import Any, Literal, Optional
 
 from web.fleet.stub_data import (
@@ -22,6 +20,7 @@ from web.fleet.stub_data import (
     get_all_modules,
 )
 
+from core.domain.reference_data import RG_REFERENCE_DATES
 from core.services.maintenance_projection import TASK_TO_CYCLE
 
 from .access_connection import (
@@ -277,10 +276,6 @@ INNER JOIN (
 """
 
 
-# Path to URG-Modulos.csv (relative to project root)
-URG_MODULOS_CSV_PATH = Path(__file__).parent.parent.parent / "docs" / "legacy_bd" / "Accdb" / "URG-Modulos.csv"
-
-
 def _normalize_coach_type(description: Optional[str], fleet_type: str) -> str:
     """
     Normalize coach type description to standard abbreviation.
@@ -317,91 +312,18 @@ def _normalize_coach_type(description: Optional[str], fleet_type: str) -> str:
     return "?"
 
 
-def load_rg_dates_from_csv() -> dict[str, tuple[date, str]]:
+def get_rg_reference_dates() -> dict[str, tuple[date, str]]:
     """
-    Load RG/commissioning dates from URG-Modulos.csv.
+    Get RG/commissioning reference dates for all modules.
     
-    File format: Módulo;Manufacturer;Tipo;Fecha
-    Example: MOD 01;CSR;Puesta en Servicio = Ultima RG;20/05/2015
+    Returns a copy of the internalized reference data containing the last RG
+    (Toshiba) or commissioning date (CSR) for each module.
     
     Returns:
         Dict mapping module_id (e.g., "M01", "T04") to (date, reference_type)
         where reference_type is "RG" or "Puesta en Servicio"
     """
-    rg_dates: dict[str, tuple[date, str]] = {}
-    
-    if not URG_MODULOS_CSV_PATH.exists():
-        logger.warning(f"URG-Modulos.csv not found at {URG_MODULOS_CSV_PATH}")
-        return rg_dates
-    
-    try:
-        # Use utf-8-sig to handle BOM (Byte Order Mark) in CSV files
-        with open(URG_MODULOS_CSV_PATH, encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f, delimiter=";")
-            
-            # Normalize fieldnames to handle encoding variations
-            # The first column may contain BOM or encoding issues with "Módulo"
-            fieldnames = reader.fieldnames or []
-            modulo_field = None
-            for fn in fieldnames:
-                # Match any variation of "Módulo" (with accents, BOM, etc.)
-                if "dulo" in fn.lower() or "modulo" in fn.lower():
-                    modulo_field = fn
-                    break
-            
-            if modulo_field is None:
-                logger.warning(
-                    "Could not find 'Módulo' column in URG-Modulos.csv. "
-                    f"Available columns: {fieldnames}"
-                )
-                return rg_dates
-            
-            for row in reader:
-                modulo_raw = row.get(modulo_field, "").strip()
-                manufacturer = row.get("Manufacturer", "").strip()
-                tipo = row.get("Tipo", "").strip()
-                fecha_str = row.get("Fecha", "").strip()
-                
-                if not modulo_raw or not fecha_str:
-                    continue
-                
-                # Parse module number from "MOD 01" format
-                match = re.search(r"\d+", modulo_raw)
-                if not match:
-                    continue
-                module_num = int(match.group())
-                
-                # Determine prefix based on manufacturer
-                if manufacturer.upper() == "CSR":
-                    prefix = "M"
-                elif manufacturer.upper() == "TOSHIBA":
-                    prefix = "T"
-                else:
-                    continue
-                
-                module_id = f"{prefix}{module_num:02d}"
-                
-                # Parse date (format: DD/MM/YYYY)
-                try:
-                    reference_date = datetime.strptime(fecha_str, "%d/%m/%Y").date()
-                except ValueError:
-                    logger.warning(f"Could not parse date '{fecha_str}' for module {module_id}")
-                    continue
-                
-                # Determine reference type
-                if "puesta en servicio" in tipo.lower():
-                    reference_type = "Puesta en Servicio"
-                else:
-                    reference_type = "RG"
-                
-                rg_dates[module_id] = (reference_date, reference_type)
-        
-        logger.info(f"Loaded {len(rg_dates)} RG dates from URG-Modulos.csv")
-        
-    except Exception as e:
-        logger.error(f"Error reading URG-Modulos.csv: {e}")
-    
-    return rg_dates
+    return RG_REFERENCE_DATES.copy()
 
 
 def _ubicacion_to_coach_type(ubicacion: Optional[str]) -> str:
@@ -793,7 +715,7 @@ def get_modules_from_access() -> list[ModuleData]:
     modules: list[ModuleData] = []
     
     # Load auxiliary data
-    rg_dates = load_rg_dates_from_csv()
+    rg_dates = get_rg_reference_dates()
     
     try:
         cursor = conn.cursor()

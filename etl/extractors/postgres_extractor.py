@@ -44,7 +44,7 @@ from web.fleet.stub_data import (
     ModuleData,
 )
 
-from .access_extractor import load_rg_dates_from_csv
+from .access_extractor import get_rg_reference_dates
 
 logger = logging.getLogger("etl")
 
@@ -179,8 +179,8 @@ def get_modules_from_postgres() -> list[ModuleData]:
         if m.nombre
     }
 
-    # RG dates from CSV (same source as access_extractor)
-    rg_dates = load_rg_dates_from_csv()
+    # RG dates from internalized reference data
+    rg_dates = get_rg_reference_dates()
 
     # Latest km per module: subquery for max fecha per modulo
     latest_km_qs = (

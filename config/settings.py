@@ -41,6 +41,10 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
     "http://localhost:8000,http://127.0.0.1:8000"
 ).split(",")
 
+# Railway deployment: add CSRF trusted origin
+if os.getenv("RAILWAY_ENVIRONMENT"):
+    CSRF_TRUSTED_ORIGINS.append("https://web-production-77ceb.up.railway.app")
+
 # Internal IPs for django-browser-reload
 INTERNAL_IPS = ["127.0.0.1"]
 

@@ -373,7 +373,6 @@ def projection_grid(request):
 
     # Build ranking data: km since highest-hierarchy cycle (DA for CSR, RG for Toshiba)
     top_cycle = "DA" if fleet_type == "CSR" else "RG"
-    ranking_top_n = 24 if fleet_type == "CSR" else 12
 
     ranking_input: list[dict] = []
     for mod in fleet_modules:
@@ -390,9 +389,7 @@ def projection_grid(request):
             "reference_type": mod.reference_type,
         })
 
-    ranking = GridProjectionService.rank_modules_by_urgency(
-        ranking_input, top_n=ranking_top_n,
-    )
+    ranking = GridProjectionService.rank_modules_by_urgency(ranking_input)
 
     # Serialise ranking for Alpine.js (dates as ISO strings)
     ranking_json = json.dumps([

@@ -313,12 +313,12 @@ class GridProjectionService:
     @staticmethod
     def rank_modules_by_urgency(
         modules_ranking_data: list[dict],
-        top_n: int = 24,
     ) -> list[ModuleRankingEntry]:
         """Rank modules by maintenance urgency (most km since reference first).
 
-        Modules are sorted by ``km_since_reference`` in descending order.
-        Modules without km data (None) are placed last with km_since = 0.
+        Returns **all** modules sorted by ``km_since_reference`` in descending
+        order.  Modules without km data (None) are placed last with
+        km_since = 0.
 
         Args:
             modules_ranking_data: List of dicts with keys:
@@ -327,11 +327,9 @@ class GridProjectionService:
                 - km_since_reference (int | None)
                 - reference_date (date | None)
                 - reference_type (str)
-            top_n: Maximum number of modules to return (default 24).
 
         Returns:
-            List of ``ModuleRankingEntry`` sorted by urgency, length
-            <= *top_n*.
+            List of ``ModuleRankingEntry`` sorted by urgency.
         """
         if not modules_ranking_data:
             return []
@@ -348,7 +346,7 @@ class GridProjectionService:
         )
 
         result: list[ModuleRankingEntry] = []
-        for i, mod in enumerate(sorted_modules[:top_n]):
+        for i, mod in enumerate(sorted_modules):
             km = mod.get("km_since_reference")
             result.append(ModuleRankingEntry(
                 rank=i + 1,

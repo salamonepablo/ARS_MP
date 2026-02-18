@@ -395,8 +395,8 @@ class TestRankModulesByUrgency:
         assert result[1].module_id == "M01"
         assert result[2].module_id == "M03"
 
-    def test_default_top_n_limits_to_24(self):
-        """Por defecto debe retornar maximo 24 modulos."""
+    def test_returns_all_modules(self):
+        """Debe retornar todos los modulos, sin limite."""
         modules = [
             {
                 "module_id": f"M{i:02d}",
@@ -405,27 +405,10 @@ class TestRankModulesByUrgency:
                 "reference_date": date(2020, 1, 1),
                 "reference_type": "RG",
             }
-            for i in range(30)
+            for i in range(86)
         ]
         result = GridProjectionService.rank_modules_by_urgency(modules)
-        assert len(result) == 24
-
-    def test_custom_top_n(self):
-        """Se puede limitar a un numero custom (ej: 12 para Toshiba)."""
-        modules = [
-            {
-                "module_id": f"T{i:02d}",
-                "fleet_type": "Toshiba",
-                "km_since_reference": 500_000 - i * 10_000,
-                "reference_date": date(2020, 1, 1),
-                "reference_type": "RG",
-            }
-            for i in range(20)
-        ]
-        result = GridProjectionService.rank_modules_by_urgency(
-            modules, top_n=12
-        )
-        assert len(result) == 12
+        assert len(result) == 86
 
     def test_modules_without_km_go_last(self):
         """Modulos sin km_since_reference (None) van al final del ranking."""
@@ -477,8 +460,8 @@ class TestRankModulesByUrgency:
         result = GridProjectionService.rank_modules_by_urgency([])
         assert result == []
 
-    def test_fewer_modules_than_top_n(self):
-        """Si hay menos modulos que top_n, retorna todos."""
+    def test_small_fleet_returns_all(self):
+        """Flota chica retorna todos los modulos disponibles."""
         modules = [
             {
                 "module_id": "T01",
@@ -495,9 +478,7 @@ class TestRankModulesByUrgency:
                 "reference_type": "RG",
             },
         ]
-        result = GridProjectionService.rank_modules_by_urgency(
-            modules, top_n=12
-        )
+        result = GridProjectionService.rank_modules_by_urgency(modules)
         assert len(result) == 2
 
     def test_rank_field_is_1_indexed(self):

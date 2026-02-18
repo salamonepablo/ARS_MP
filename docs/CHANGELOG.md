@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Maintenance Priority Ranking modal** (`Ctrl+M` or "Prioridad Mant." button):
-  - Shows top 24 modules (CSR) or top 12 (Toshiba) ranked by km since last DA/RG intervention
+  - Shows all modules ranked by km since last DA/RG intervention (descending order)
   - Columns: rank, module ID, km since reference, reference date, reference type
   - Double-click a row to navigate to the module's DA/RG row in the grid (auto-scroll + highlight)
   - Interventions marked in the grid automatically sync back to the modal (green highlight + counter)

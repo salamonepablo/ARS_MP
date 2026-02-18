@@ -55,7 +55,7 @@ ARS_MP resuelve esto con un pipeline ETL que normaliza datos legacy y una interf
 
 ![Modal ranking abierto](docs/images/planner-ranking-modal-open.png)
 
-*Top 24 modulos (CSR) o 12 (Toshiba) ordenados por km desde ultima DA/RG. Doble-click navega al modulo en la grilla. Modulos con intervenciones marcadas se resaltan en verde (2 seleccionados en este ejemplo).*
+*Todos los modulos de la flota ordenados por km desde ultima DA/RG. Doble-click navega al modulo en la grilla. Modulos con intervenciones marcadas se resaltan en verde (2 seleccionados en este ejemplo).*
 
 ### Exportacion a Excel
 
@@ -80,7 +80,7 @@ ARS_MP resuelve esto con un pipeline ETL que normaliza datos legacy y una interf
 | Frontend | Django Templates + HTMX + Alpine.js |
 | Estilos | Tailwind CSS v4 |
 | Contenedores | Docker Compose (PostgreSQL) |
-| Testing | pytest (236 tests) + coverage |
+| Testing | pytest (235 tests) + coverage |
 | Export | openpyxl (Excel con formato) |
 | Control de versiones | Git + GitHub |
 
@@ -110,7 +110,7 @@ ARS_MP/
 │   └── database/          # Modelos Django (StgModulo, StgKilometraje, etc.)
 ├── templates/             # Base templates (navbar, layout)
 ├── theme/                 # Tailwind CSS v4
-├── tests/                 # 236 tests (97% coverage en core/)
+├── tests/                 # 235 tests (97% coverage en core/)
 ├── docs/                  # Documentacion del proyecto
 │   ├── decisions/         # ADRs (Architecture Decision Records)
 │   ├── images/            # Screenshots del README
@@ -182,7 +182,7 @@ ARS_MP/
 - **Header sticky vertical**: encabezados de meses visibles al scrollear (`max-h-[75vh]`)
 - Fila resumen por ciclo + fila "Control" de totales
 - Selector de flota (CSR / Toshiba), meses y KM promedio mensual configurables
-- **Modal de Prioridad de Mantenimiento** (`Ctrl+M`): ranking de los top 24 (CSR) o 12 (Toshiba) módulos con más km desde última DA/RG. Doble-click navega al módulo en la grilla; intervenciones marcadas en la grilla se reflejan automáticamente en el modal
+- **Modal de Prioridad de Mantenimiento** (`Ctrl+M`): ranking de todos los módulos ordenados por km desde última DA/RG. Doble-click navega al módulo en la grilla; intervenciones marcadas en la grilla se reflejan automáticamente en el modal
 
 ### 6. Exportacion a Excel
 
@@ -298,7 +298,7 @@ py -m pytest -m ""
 ### Resultados actuales
 
 ```
-236 passed, 2 deselected (integration)
+235 passed, 2 deselected (integration)
 core/services/ — 97% coverage
 ```
 
@@ -313,7 +313,7 @@ core/services/ — 97% coverage
 | Modulo | Tests | Cobertura |
 |--------|-------|-----------|
 | Authentication | 14 | |
-| Grid projection service | 28 | core/services/ 97% |
+| Grid projection service | 27 | core/services/ 97% |
 | Maintenance projection | 31 | |
 | Fleet views | 24 | |
 | PostgreSQL extractor | 26 | |
@@ -329,7 +329,7 @@ core/services/ — 97% coverage
 | `etl/` | Pipeline ETL: extractores (Access, PostgreSQL), transformadores, loaders. |
 | `web/fleet/` | App Django: vistas, templates, URLs, template tags. |
 | `infrastructure/` | Modelos Django (staging tables), integraciones externas. |
-| `tests/` | 236 tests organizados por modulo. |
+| `tests/` | 235 tests organizados por modulo. |
 | `docs/` | Documentacion tecnica en ingles: ADRs, schema legacy, screenshots, CHANGELOG. |
 | `context/` | Reglas de negocio en espanol. |
 | `scripts/` | Utilidades: test de conexion, toggle de path local/remoto. |

@@ -31,6 +31,12 @@ DEBUG = os.getenv("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
+# CSRF trusted origins for Railway/production
+CSRF_TRUSTED_ORIGINS = os.getenv(
+    "CSRF_TRUSTED_ORIGINS",
+    "http://localhost:8000,http://127.0.0.1:8000"
+).split(",")
+
 # Internal IPs for django-browser-reload
 INTERNAL_IPS = ["127.0.0.1"]
 
@@ -64,6 +70,7 @@ NPM_BIN_PATH = "npm"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -179,6 +186,12 @@ STATICFILES_DIRS = [
     BASE_DIR / "theme" / "static",
     BASE_DIR / "web" / "static",
 ]
+
+# Production static files (collectstatic output)
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# WhiteNoise compression and caching
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 
 # =============================================================================

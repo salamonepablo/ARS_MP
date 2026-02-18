@@ -6,7 +6,7 @@ Sistema de proyeccion y planificacion de mantenimiento ferroviario para el mater
 
 ## Problema que resuelve
 
-La operadora ferroviaria gestiona **111 modulos** (86 CSR + 25 Toshiba) con sistemas legacy heterogeneos: bases Access (.mdb/.accdb) desde los anos 90, planillas Excel manuales y aplicaciones VB6. No existe una vista unificada que permita:
+La operadora ferroviaria gestiona **111 modulos** (86 CSR + 25 Toshiba) con sistemas legacy heterogeneos: bases Access (.mdb/.accdb) desde los años 90, planillas Excel manuales y aplicaciones VB6. No existe una vista unificada que permita:
 
 - Ver el estado de mantenimiento de toda la flota en un solo lugar
 - Proyectar cuando cada modulo alcanzara su proximo ciclo de mantenimiento pesado
@@ -17,10 +17,19 @@ ARS_MP resuelve esto con un pipeline ETL que normaliza datos legacy y una interf
 
 ## Screenshots
 
-### Vista encabezado — Resumen de Kms flota
-![Encabezado](docs/images/image.png)
+### Login
 
-### Vista de flota — Tarjetas de modulos
+![Login](docs/images/login.png)
+
+*Pantalla de autenticacion con logo ARS_MP, branding Trenes Argentinos y formulario de credenciales. Passwords hasheados con Argon2.*
+
+### Vista de flota — Navbar + Resumen de KMs
+
+![Navbar y resumen](docs/images/navbar-logo.png)
+
+*Navbar con logo ARS_MP + Trenes Argentinos, usuario autenticado con boton "Salir". KPIs de kilometraje mensual por flota, filtros CSR/Toshiba, acceso directo al Maintenance Planner.*
+
+### Tarjetas de modulos
 
 #### CSR
 ![Tarjetas de Flota CSR](docs/images/image-1.png)
@@ -36,27 +45,17 @@ ARS_MP resuelve esto con un pipeline ETL que normaliza datos legacy y una interf
 
 *Informacion general, kilometraje, ultimo mantenimiento, proxima intervencion estimada, y tabla de datos clave por ciclo pesado con barras de progreso.*
 
-### Indicacion de origen de datos
-![Origen de Datos](docs/images/image-3.png)
-
-*Timestamp de la ultima sincronizacion con el origen de datos y manager de sincronizacion. Al despliegue en produccion se incorporara un trigger para sincronizacion automatica.*
-
 ### Maintenance Planner — Grilla de proyeccion
 
-#### CSR
-![Grilla de proyeccion](docs/images/image-4.png)
+![Grilla con boton Prioridad Mant.](docs/images/planner-ranking-modal-button.png)
 
-![Grilla de proyeccion 2](docs/images/image-5.png)
+*Grilla interactiva: filas por modulo y ciclo pesado, columnas por mes (18 por defecto). Semaforo de colores cuando el KM acumulado supera el umbral. Doble-click para marcar intervenciones con reset en cascada por jerarquia. Boton "Prioridad Mant." (`Ctrl+M`) para abrir el ranking de modulos.*
 
-#### Toshiba
-![Grilla de proyeccion 3](docs/images/image-6.png)
+### Modal de Prioridad de Mantenimiento
 
-![Grilla de proyeccion 4](docs/images/image-7.png)
+![Modal ranking abierto](docs/images/planner-ranking-modal-open.png)
 
-### Resumen al pie de la grilla
-![Resumen](docs/images/image-8.png)
-
-*Grilla interactiva: filas por modulo y ciclo pesado, columnas por mes (18 por defecto). Semaforo de colores cuando el KM acumulado supera el umbral. Doble-click para marcar intervenciones con reset en cascada por jerarquia. Totalizadores mensuales al final de la grilla.*
+*Todos los modulos de la flota ordenados por km desde ultima DA/RG. Doble-click navega al modulo en la grilla. Modulos con intervenciones marcadas se resaltan en verde (2 seleccionados en este ejemplo).*
 
 ### Exportacion a Excel
 
@@ -81,7 +80,7 @@ ARS_MP resuelve esto con un pipeline ETL que normaliza datos legacy y una interf
 | Frontend | Django Templates + HTMX + Alpine.js |
 | Estilos | Tailwind CSS v4 |
 | Contenedores | Docker Compose (PostgreSQL) |
-| Testing | pytest (214 tests) + coverage |
+| Testing | pytest (235 tests) + coverage |
 | Export | openpyxl (Excel con formato) |
 | Control de versiones | Git + GitHub |
 
@@ -111,13 +110,12 @@ ARS_MP/
 │   └── database/          # Modelos Django (StgModulo, StgKilometraje, etc.)
 ├── templates/             # Base templates (navbar, layout)
 ├── theme/                 # Tailwind CSS v4
-├── tests/                 # 214 tests (97% coverage en core/)
+├── tests/                 # 235 tests (97% coverage en core/)
 ├── docs/                  # Documentacion del proyecto
 │   ├── decisions/         # ADRs (Architecture Decision Records)
 │   ├── images/            # Screenshots del README
 │   ├── legacy_bd/         # Archivos legacy de prueba + schema introspection
 │   ├── ai_workflow.md     # Proceso de desarrollo asistido con IA
-│   ├── slides_guion.md    # Guion para la presentacion de slides
 │   ├── CHANGELOG.md       # Historial de cambios (Keep a Changelog)
 │   ├── access_connection.md # Configuracion de conexion Access + troubleshooting
 │   ├── maintenance_cycle.md # Ciclos de mantenimiento y reglas de negocio
@@ -142,21 +140,28 @@ ARS_MP/
 
 ## Funcionalidades principales
 
-### 1. ETL desde sistemas legacy
+### 1. Autenticacion
+
+- Login requerido para acceder a todas las vistas del sistema
+- Passwords hasheados con **Argon2** (ganador de PHC, recomendado por OWASP)
+- Pagina de login con branding Trenes Argentinos y logo ARS_MP
+- Navbar con usuario autenticado y boton "Salir"
+
+### 2. ETL desde sistemas legacy
 
 - **Extraccion**: Conectores ODBC a Access (.mdb/.accdb), CSV con encoding BOM-safe, Excel
 - **Staging**: Tablas PostgreSQL intermedias (`StgModulo`, `StgKilometraje`, `StgMantenimiento`)
 - **Sync incremental**: Comando `py manage.py sync_access` con logging y estadisticas
 - **Fallback**: Si la BD Access no esta disponible, la app funciona con datos stub
 
-### 2. Vista de flota (111 tarjetas)
+### 3. Vista de flota (111 tarjetas)
 
 - **URL**: `/fleet/modules/`
 - Tarjetas por modulo con: KM mes, KM total, ultimo mantenimiento, tipo, fecha, dias transcurridos
 - Filtros: todos / CSR / Toshiba
 - Link a detalle de cada modulo
 
-### 3. Detalle de modulo
+### 4. Detalle de modulo
 
 - **URL**: `/fleet/modules/<module_id>/`
 - Información general, kilometraje, composición de coches
@@ -164,7 +169,7 @@ ARS_MP/
 - Historial de intervenciones (último año)
 - Selector rápido para navegar entre módulos
 
-### 4. Maintenance Planner (grilla de proyección)
+### 5. Maintenance Planner (grilla de proyección)
 
 - **URL**: `/fleet/planner/`
 - Grilla tipo Excel: filas = modulo x ciclo pesado, columnas = meses (configurable, default 18)
@@ -174,10 +179,12 @@ ARS_MP/
 - **Doble-click interactivo**: marca intervención, resetea KM a 0 en esa fila y filas herederas (jerarquía), con propagación en cascada
 - Prorrateo del mes actual según día del mes
 - Columnas sticky (Módulo, Fecha, Ciclo, Umbral) para scroll horizontal
+- **Header sticky vertical**: encabezados de meses visibles al scrollear (`max-h-[75vh]`)
 - Fila resumen por ciclo + fila "Control" de totales
 - Selector de flota (CSR / Toshiba), meses y KM promedio mensual configurables
+- **Modal de Prioridad de Mantenimiento** (`Ctrl+M`): ranking de todos los módulos ordenados por km desde última DA/RG. Doble-click navega al módulo en la grilla; intervenciones marcadas en la grilla se reflejan automáticamente en el modal
 
-### 5. Exportacion a Excel
+### 6. Exportacion a Excel
 
 - **URL**: `/fleet/planner/export/`
 - Archivo `.xlsx` con colores identicos al semaforo web
@@ -185,7 +192,7 @@ ARS_MP/
 - Freeze panes, formato numerico europeo, filas de resumen
 - Nombre del archivo con fecha: `proyeccion_csr_2026-02-12.xlsx`
 
-### 6. Jerarquia de mantenimiento
+### 7. Jerarquia de mantenimiento
 
 - **Regla clave**: una intervencion de mayor jerarquia "pisa" (resetea) todas las inferiores
 - CSR: DA > PE > BA > AN > IB > IQ (6 ciclos, 4 pesados)
@@ -220,8 +227,28 @@ pip install -r requirements.txt
 
 ```powershell
 cp .env.example .env
-# Editar .env con las credenciales de PostgreSQL
+# Editar .env con las credenciales de PostgreSQL y la ruta a la BD Access
 ```
+
+La variable `LEGACY_ACCESS_DB_PATH` admite dos configuraciones segun el entorno:
+
+| Entorno | Valor de `LEGACY_ACCESS_DB_PATH` |
+|---------|----------------------------------|
+| **Corporativo (Trenes Argentinos)** | Ruta al disco de red de la empresa (ej. `\\servidor\ruta\DB_CCEE_Programacion 1.1.accdb`) |
+| **Evaluacion academica / desarrollo local** | `docs/legacy_bd/Accdb/DB_CCEE_Programación 1.1.accdb` (valor por defecto en `.env.example`) |
+
+#### Archivos de datos legacy necesarios
+
+La aplicacion lee **2 archivos** de datos legacy en tiempo de ejecucion:
+
+| Archivo | Ubicacion | Incluido en el repo | Proposito |
+|---------|-----------|---------------------|-----------|
+| `DB_CCEE_Programación 1.1.accdb` | `docs/legacy_bd/Accdb/` | No (`.gitignore`, descargar de Drive) | Base de datos Access con modulos, kilometrajes, OTs y coches |
+| `URG-Modulos.csv` | `docs/legacy_bd/Accdb/` | **Si** (incluido en el repo) | Fechas de RG y Puesta en Servicio por modulo — requerido en todos los modos de operacion |
+
+> **Para evaluadores del TFM**: la base de datos Access con datos reales esta disponible para descarga en [Google Drive](https://drive.google.com/drive/folders/1AcMTlrkN62W718JknnJeKEjRkT8h29bI?usp=drive_link). Descargar `DB_CCEE_Programación 1.1.accdb` y copiarlo en `docs/legacy_bd/Accdb/`. El archivo `URG-Modulos.csv` ya viene incluido en el repositorio. Los datos no estaran actualizados al momento de la correccion pero son datos operativos reales de Linea Roca.
+>
+> Sin la base Access, la aplicacion funciona en modo stub (datos generados) pero las proyecciones del Maintenance Planner no tendran datos reales.
 
 ### 4) Levantar PostgreSQL con Docker
 
@@ -235,14 +262,20 @@ docker compose up -d db
 py manage.py migrate
 ```
 
-### 6) (Opcional) Sincronizar datos desde Access
+### 6) Crear usuario administrador
+
+```powershell
+py manage.py createsuperuser
+```
+
+### 7) (Opcional) Sincronizar datos desde Access
 
 ```powershell
 # Requiere ODBC driver + .accdb configurado en .env
 py manage.py sync_access
 ```
 
-### 7) Compilar Tailwind CSS
+### 8) Compilar Tailwind CSS
 
 ```powershell
 cd theme/static_src
@@ -251,7 +284,7 @@ npm run build
 cd ../..
 ```
 
-### 8) Iniciar servidor de desarrollo
+### 9) Iniciar servidor de desarrollo
 
 ```powershell
 py manage.py runserver
@@ -261,6 +294,7 @@ Acceder a:
 
 | Vista | URL |
 |-------|-----|
+| Login | http://127.0.0.1:8000/accounts/login/ |
 | Flota (tarjetas) | http://127.0.0.1:8000/fleet/modules/ |
 | Detalle modulo | http://127.0.0.1:8000/fleet/modules/M01/ |
 | Maintenance Planner | http://127.0.0.1:8000/fleet/planner/ |
@@ -284,7 +318,7 @@ py -m pytest -m ""
 ### Resultados actuales
 
 ```
-214 passed, 2 deselected (integration)
+235 passed, 2 deselected (integration)
 core/services/ — 97% coverage
 ```
 
@@ -298,7 +332,8 @@ core/services/ — 97% coverage
 
 | Modulo | Tests | Cobertura |
 |--------|-------|-----------|
-| Grid projection service | 20 | core/services/ 97% |
+| Authentication | 14 | |
+| Grid projection service | 27 | core/services/ 97% |
 | Maintenance projection | 31 | |
 | Fleet views | 24 | |
 | PostgreSQL extractor | 26 | |
@@ -314,7 +349,7 @@ core/services/ — 97% coverage
 | `etl/` | Pipeline ETL: extractores (Access, PostgreSQL), transformadores, loaders. |
 | `web/fleet/` | App Django: vistas, templates, URLs, template tags. |
 | `infrastructure/` | Modelos Django (staging tables), integraciones externas. |
-| `tests/` | 214 tests organizados por modulo. |
+| `tests/` | 235 tests organizados por modulo. |
 | `docs/` | Documentacion tecnica en ingles: ADRs, schema legacy, screenshots, CHANGELOG. |
 | `context/` | Reglas de negocio en espanol. |
 | `scripts/` | Utilidades: test de conexion, toggle de path local/remoto. |
@@ -325,6 +360,7 @@ core/services/ — 97% coverage
 |-----------|-------------|
 | [docs/decisions/projection_grid.md](docs/decisions/projection_grid.md) | ADR: diseno de la grilla de proyeccion |
 | [docs/decisions/access_to_postgres_staging.md](docs/decisions/access_to_postgres_staging.md) | ADR: migracion de ODBC directo a staging PostgreSQL |
+| [docs/authentication.md](docs/authentication.md) | Autenticacion: setup, creacion de usuarios, Argon2 |
 | [docs/access_connection.md](docs/access_connection.md) | Configuracion de conexion Access + troubleshooting |
 | [docs/postgres_docker.md](docs/postgres_docker.md) | Setup de PostgreSQL con Docker |
 | [docs/maintenance_cycle.md](docs/maintenance_cycle.md) | Ciclos de mantenimiento por flota |
@@ -340,8 +376,9 @@ TODO: Agregar informacion de despliegue cuando se defina la estrategia.
 
 ## Slides de presentacion
 
-<!-- TODO: Agregar link a Google Slides cuando esten listas -->
-*Pendiente — se agregara el link a la presentacion de Google Slides.*
+La presentacion del TFM esta disponible en el repositorio:
+
+- [`docs/slides/ARS_MP_presentacion.pdf`](docs/slides/ARS_MP_presentacion.pdf)
 
 ## Convenciones de codigo
 

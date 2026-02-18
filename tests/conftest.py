@@ -4,6 +4,8 @@ Pytest configuration and fixtures for ARS_MP tests.
 
 import pytest
 from datetime import date
+from django.contrib.auth.models import User
+from django.test import Client
 
 
 @pytest.fixture
@@ -51,3 +53,21 @@ def all_modules():
     from web.fleet.stub_data import get_all_modules
 
     return get_all_modules()
+
+
+@pytest.fixture
+def auth_user(db):
+    """Create a test user for authentication."""
+    return User.objects.create_user(
+        username="analista",
+        password="testpass123!",
+        email="analista@trenesargentinos.gob.ar",
+    )
+
+
+@pytest.fixture
+def authenticated_client(auth_user):
+    """Provide a Django test client with an authenticated session."""
+    client = Client()
+    client.login(username="analista", password="testpass123!")
+    return client

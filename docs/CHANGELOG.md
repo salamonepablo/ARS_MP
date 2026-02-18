@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Maintenance Priority Ranking modal** (`Ctrl+M` or "Prioridad Mant." button):
+  - Shows all modules ranked by km since last DA/RG intervention (descending order)
+  - Columns: rank, module ID, km since reference, reference date, reference type
+  - Double-click a row to navigate to the module's DA/RG row in the grid (auto-scroll + highlight)
+  - Interventions marked in the grid automatically sync back to the modal (green highlight + counter)
+  - Keyboard shortcut `Ctrl+M` to open/close the modal
+  - New `ModuleRankingEntry` DTO and `GridProjectionService.rank_modules_by_urgency()` in core service layer
+
+- **Sticky grid header**: month column headers now remain visible when scrolling vertically (`max-h-[75vh]` scroll container)
+
+- **Login & Authentication**:
+  - Django built-in auth with Argon2 password hashing (`argon2-cffi`)
+  - `@login_required` on all 6 fleet views (module list, module detail, projection grid, export, sync status, root redirect)
+  - Login page with Trenes Argentinos branding at `/accounts/login/`
+  - Logout button in navbar showing current username
+  - 14 new tests: redirect checks, login/logout flow, password hashing verification
+
+- **AGENTS.md**: rewritten with concise build/test commands, code style guidelines, and project architecture reference for AI coding agents
+
+### Changed
+
+- Grid projection tests: 28 tests (was 20), added 8 tests for `TestRankModulesByUrgency`
+- Fleet view tests: all 24 tests updated to use `authenticated_client` fixture
+
 ## [1.0.0] - 2026-02-12
 
 First feature-complete release for the TFM (Trabajo Final de Master).

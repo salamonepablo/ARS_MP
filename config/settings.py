@@ -120,6 +120,22 @@ else:
 
 
 # =============================================================================
+# Authentication
+# =============================================================================
+
+LOGIN_URL = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/fleet/modules/"
+LOGOUT_REDIRECT_URL = "/accounts/login/"
+
+# Password hashers — Argon2 primary (OWASP recommended), PBKDF2 fallback
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+]
+
+
+# =============================================================================
 # Password validation
 # =============================================================================
 

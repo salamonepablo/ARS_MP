@@ -10,6 +10,7 @@ import logging
 import subprocess
 import sys
 
+from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
@@ -43,6 +44,7 @@ from .stub_data import get_fleet_summary
 logger = logging.getLogger(__name__)
 
 
+@login_required
 @require_GET
 def module_list(request):
     """
@@ -79,6 +81,7 @@ def module_list(request):
     return render(request, "fleet/module_list.html", context)
 
 
+@login_required
 @require_GET
 def module_detail(request, module_id: str):
     """
@@ -183,6 +186,7 @@ def module_detail(request, module_id: str):
 # Sync Access → Postgres
 # ---------------------------------------------------------------------------
 
+@login_required
 @require_GET
 def sync_status(request):
     """
@@ -215,6 +219,7 @@ def sync_status(request):
     })
 
 
+@login_required
 @require_POST
 def sync_trigger(request):
     """
@@ -267,6 +272,7 @@ def sync_trigger(request):
 # Maintenance Planner (projection grid)
 # ---------------------------------------------------------------------------
 
+@login_required
 @require_GET
 def projection_grid(request):
     """
@@ -365,6 +371,42 @@ def projection_grid(request):
             {"cycle_type": "RB", "color_bg": "bg-yellow-100", "color_text": "text-yellow-800"},
         ]
 
+    # Build ranking data: km since highest-hierarchy cycle (DA for CSR, RG for Toshiba)
+    top_cycle = "DA" if fleet_type == "CSR" else "RG"
+
+    ranking_input: list[dict] = []
+    for mod in fleet_modules:
+        km_since = None
+        for kd in mod.maintenance_key_data:
+            if kd.cycle_type == top_cycle:
+                km_since = kd.km_since
+                break
+        ranking_input.append({
+            "module_id": mod.module_id,
+            "fleet_type": mod.fleet_type,
+            "km_since_reference": km_since,
+            "reference_date": mod.reference_date,
+            "reference_type": mod.reference_type,
+        })
+
+    ranking = GridProjectionService.rank_modules_by_urgency(ranking_input)
+
+    # Serialise ranking for Alpine.js (dates as ISO strings)
+    ranking_json = json.dumps([
+        {
+            "rank": entry.rank,
+            "module_id": entry.module_id,
+            "fleet_type": entry.fleet_type,
+            "km_since_reference": entry.km_since_reference,
+            "reference_date": (
+                entry.reference_date.isoformat()
+                if entry.reference_date else None
+            ),
+            "reference_type": entry.reference_type,
+        }
+        for entry in ranking
+    ])
+
     context = {
         "grid": grid,
         "month_headers": month_headers,
@@ -375,11 +417,14 @@ def projection_grid(request):
         "avg_km_csr": DEFAULT_AVG_MONTHLY_KM["CSR"],
         "avg_km_toshiba": DEFAULT_AVG_MONTHLY_KM["Toshiba"],
         "summary_cycles": summary_cycles,
+        "ranking_json": ranking_json,
+        "ranking_top_cycle": top_cycle,
     }
 
     return render(request, "fleet/projection_grid.html", context)
 
 
+@login_required
 @require_GET
 def projection_export(request):
     """

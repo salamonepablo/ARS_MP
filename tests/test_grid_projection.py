@@ -19,6 +19,7 @@ from core.services.grid_projection import (
     MonthProjection,
     CycleRow,
     ModuleGridData,
+    ModuleRankingEntry,
     GridProjectionService,
 )
 
@@ -354,3 +355,144 @@ class TestCycleRowLastDate:
         assert result.cycle_rows[2].last_date is None
         # AN (index 3) has last_date
         assert result.cycle_rows[3].last_date == date(2024, 6, 15)
+
+
+class TestRankModulesByUrgency:
+    """Tests para el ranking de modulos por urgencia de mantenimiento.
+
+    El ranking ordena modulos por km acumulados desde la ultima RG
+    (o fecha de puesta en servicio) en orden descendente — el modulo
+    con mas km desde referencia es el mas urgente.
+    """
+
+    def test_sorts_by_km_since_reference_descending(self):
+        """Los modulos con mas km desde referencia deben ir primero."""
+        modules = [
+            {
+                "module_id": "M01",
+                "fleet_type": "CSR",
+                "km_since_reference": 800_000,
+                "reference_date": date(2015, 5, 20),
+                "reference_type": "Puesta en Servicio",
+            },
+            {
+                "module_id": "M02",
+                "fleet_type": "CSR",
+                "km_since_reference": 1_200_000,
+                "reference_date": date(2018, 3, 10),
+                "reference_type": "RG",
+            },
+            {
+                "module_id": "M03",
+                "fleet_type": "CSR",
+                "km_since_reference": 500_000,
+                "reference_date": date(2020, 1, 1),
+                "reference_type": "RG",
+            },
+        ]
+        result = GridProjectionService.rank_modules_by_urgency(modules)
+        assert result[0].module_id == "M02"
+        assert result[1].module_id == "M01"
+        assert result[2].module_id == "M03"
+
+    def test_returns_all_modules(self):
+        """Debe retornar todos los modulos, sin limite."""
+        modules = [
+            {
+                "module_id": f"M{i:02d}",
+                "fleet_type": "CSR",
+                "km_since_reference": 1_000_000 - i * 10_000,
+                "reference_date": date(2020, 1, 1),
+                "reference_type": "RG",
+            }
+            for i in range(86)
+        ]
+        result = GridProjectionService.rank_modules_by_urgency(modules)
+        assert len(result) == 86
+
+    def test_modules_without_km_go_last(self):
+        """Modulos sin km_since_reference (None) van al final del ranking."""
+        modules = [
+            {
+                "module_id": "M01",
+                "fleet_type": "CSR",
+                "km_since_reference": None,
+                "reference_date": None,
+                "reference_type": "",
+            },
+            {
+                "module_id": "M02",
+                "fleet_type": "CSR",
+                "km_since_reference": 300_000,
+                "reference_date": date(2020, 1, 1),
+                "reference_type": "RG",
+            },
+        ]
+        result = GridProjectionService.rank_modules_by_urgency(modules)
+        assert result[0].module_id == "M02"
+        assert result[1].module_id == "M01"
+        assert result[1].km_since_reference == 0
+
+    def test_returns_module_ranking_entry_instances(self):
+        """Cada elemento del resultado debe ser un ModuleRankingEntry."""
+        modules = [
+            {
+                "module_id": "M01",
+                "fleet_type": "CSR",
+                "km_since_reference": 600_000,
+                "reference_date": date(2018, 8, 20),
+                "reference_type": "RG",
+            },
+        ]
+        result = GridProjectionService.rank_modules_by_urgency(modules)
+        assert len(result) == 1
+        entry = result[0]
+        assert isinstance(entry, ModuleRankingEntry)
+        assert entry.module_id == "M01"
+        assert entry.fleet_type == "CSR"
+        assert entry.km_since_reference == 600_000
+        assert entry.reference_date == date(2018, 8, 20)
+        assert entry.reference_type == "RG"
+        assert entry.rank == 1
+
+    def test_empty_input_returns_empty_list(self):
+        """Lista vacia de modulos devuelve lista vacia."""
+        result = GridProjectionService.rank_modules_by_urgency([])
+        assert result == []
+
+    def test_small_fleet_returns_all(self):
+        """Flota chica retorna todos los modulos disponibles."""
+        modules = [
+            {
+                "module_id": "T01",
+                "fleet_type": "Toshiba",
+                "km_since_reference": 400_000,
+                "reference_date": date(2021, 6, 1),
+                "reference_type": "RG",
+            },
+            {
+                "module_id": "T02",
+                "fleet_type": "Toshiba",
+                "km_since_reference": 200_000,
+                "reference_date": date(2022, 3, 15),
+                "reference_type": "RG",
+            },
+        ]
+        result = GridProjectionService.rank_modules_by_urgency(modules)
+        assert len(result) == 2
+
+    def test_rank_field_is_1_indexed(self):
+        """El campo rank debe ser 1-indexed (1, 2, 3...)."""
+        modules = [
+            {
+                "module_id": f"M{i:02d}",
+                "fleet_type": "CSR",
+                "km_since_reference": 500_000 - i * 50_000,
+                "reference_date": date(2020, 1, 1),
+                "reference_type": "RG",
+            }
+            for i in range(5)
+        ]
+        result = GridProjectionService.rank_modules_by_urgency(modules)
+        for i, entry in enumerate(result):
+            assert entry.rank == i + 1

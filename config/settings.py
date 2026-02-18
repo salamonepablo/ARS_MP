@@ -31,9 +31,9 @@ DEBUG = os.getenv("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
-# Railway healthcheck host (always allowed for health checks)
-if "healthcheck.railway.app" not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append("healthcheck.railway.app")
+# Railway deployment: allow all .railway.app subdomains
+if os.getenv("RAILWAY_ENVIRONMENT"):
+    ALLOWED_HOSTS.append(".railway.app")
 
 # CSRF trusted origins for Railway/production
 CSRF_TRUSTED_ORIGINS = os.getenv(

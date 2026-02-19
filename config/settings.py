@@ -48,6 +48,12 @@ if os.getenv("RAILWAY_ENVIRONMENT"):
 # Internal IPs for django-browser-reload
 INTERNAL_IPS = ["127.0.0.1"]
 
+# Security settings for production (Railway)
+if os.getenv("RAILWAY_ENVIRONMENT"):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
 
 # =============================================================================
 # Application definition

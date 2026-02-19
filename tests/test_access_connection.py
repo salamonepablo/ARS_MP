@@ -234,8 +234,8 @@ class TestFallbackBehavior:
         with patch("etl.extractors.access_extractor.is_access_available", return_value=False):
             result = get_modules_with_fallback()
 
-        # Should return stub data (111 modules)
-        assert len(result) == 111
+        # Should return stub data (110 modules: 85 CSR + 25 Toshiba, M67 excluded)
+        assert len(result) == 110
         assert all(isinstance(m, ModuleData) for m in result)
 
     def test_get_modules_logs_warning_on_fallback(self, caplog):
@@ -250,9 +250,9 @@ class TestFallbackBehavior:
         with patch("etl.extractors.access_extractor.is_access_available", return_value=False):
             result = get_modules_with_fallback()
 
-        # When falling back to stub data, we get exactly 111 modules
-        # This confirms the fallback path was taken
-        assert len(result) == 111
+        # When falling back to stub data, we get exactly 110 modules
+        # This confirms the fallback path was taken (M67 excluded)
+        assert len(result) == 110
 
 
 @pytest.mark.integration

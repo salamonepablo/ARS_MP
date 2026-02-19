@@ -45,10 +45,10 @@ class TestModuleListView:
         assert "fleet/module_list.html" in [t.name for t in response.templates]
 
     def test_context_contains_modules(self, authenticated_client, mock_stub_data):
-        """Context should contain 'modules' list with 111 modules (stub data)."""
+        """Context should contain 'modules' list with 110 modules (stub data, M67 excluded)."""
         response = authenticated_client.get("/fleet/modules/")
         assert "modules" in response.context
-        assert len(response.context["modules"]) == 111
+        assert len(response.context["modules"]) == 110
 
     def test_context_contains_summary(self, authenticated_client, mock_stub_data):
         """Context should contain 'summary' dict with KPIs."""
@@ -56,8 +56,8 @@ class TestModuleListView:
         assert "summary" in response.context
         
         summary = response.context["summary"]
-        assert summary["total_count"] == 111
-        assert summary["csr_count"] == 86
+        assert summary["total_count"] == 110
+        assert summary["csr_count"] == 85  # M67 excluded
         assert summary["toshiba_count"] == 25
 
     def test_context_contains_fleet_filter(self, authenticated_client, mock_stub_data):
@@ -67,12 +67,12 @@ class TestModuleListView:
         assert response.context["fleet_filter"] == "all"
 
     def test_filter_by_csr(self, authenticated_client, mock_stub_data):
-        """Filtering by CSR should return only CSR modules."""
+        """Filtering by CSR should return only CSR modules (M67 excluded)."""
         response = authenticated_client.get("/fleet/modules/?fleet=csr")
         
         assert response.context["fleet_filter"] == "csr"
         modules = response.context["modules"]
-        assert len(modules) == 86
+        assert len(modules) == 85  # M67 excluded
         for module in modules:
             assert module.fleet_type == "CSR"
 
@@ -153,8 +153,8 @@ class TestModuleDetailView:
         assert response.status_code == 200
 
     def test_detail_returns_200_for_toshiba(self, authenticated_client, mock_stub_data):
-        """Detail view should return 200 for a valid Toshiba module."""
-        response = authenticated_client.get("/fleet/modules/T01/")
+        """Detail view should return 200 for a valid Toshiba module (real ID)."""
+        response = authenticated_client.get("/fleet/modules/T04/")
         assert response.status_code == 200
 
     def test_detail_returns_404_for_invalid(self, authenticated_client, mock_stub_data):
@@ -197,7 +197,7 @@ class TestModuleDetailView:
         response = authenticated_client.get("/fleet/modules/M01/")
         assert "module_options" in response.context
         options = response.context["module_options"]
-        assert len(options) == 111  # 86 CSR + 25 Toshiba
+        assert len(options) == 110  # 85 CSR + 25 Toshiba (M67 excluded)
 
     def test_detail_module_has_key_data(self, authenticated_client, mock_stub_data):
         """Module should have maintenance_key_data populated."""
@@ -209,7 +209,7 @@ class TestModuleDetailView:
 
     def test_detail_toshiba_has_key_data(self, authenticated_client, mock_stub_data):
         """Toshiba module should have 2 key data entries (RB, RG)."""
-        response = authenticated_client.get("/fleet/modules/T01/")
+        response = authenticated_client.get("/fleet/modules/T04/")
         module = response.context["module"]
         assert len(module.maintenance_key_data) == 2
 

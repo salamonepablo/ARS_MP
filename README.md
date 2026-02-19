@@ -11,7 +11,7 @@ La operadora ferroviaria gestiona **111 modulos** (86 CSR + 25 Toshiba) con sist
 - Ver el estado de mantenimiento de toda la flota en un solo lugar
 - Proyectar cuando cada modulo alcanzara su proximo ciclo de mantenimiento pesado
 - Simular intervenciones y ver su impacto en cascada sobre ciclos inferiores
-- Exportar la planificacion a Excel para compartir con talleres y gerencia
+- Exportar la planificacion a Excel para compartir con talleres, gerencia y CNRT
 
 ARS_MP resuelve esto con un pipeline ETL que normaliza datos legacy y una interfaz web interactiva.
 
@@ -42,6 +42,8 @@ ARS_MP resuelve esto con un pipeline ETL que normaliza datos legacy y una interf
 ### Detalle de modulo
 
 ![Detalle modulo](docs/images/image-3.png)
+
+![Detalle modulo 2](docs/images/image-3-bis.png)
 
 *Informacion general, kilometraje, ultimo mantenimiento, proxima intervencion estimada, y tabla de datos clave por ciclo pesado con barras de progreso.*
 
@@ -239,11 +241,11 @@ La variable `LEGACY_ACCESS_DB_PATH` admite dos configuraciones segun el entorno:
 
 #### Modo de operacion sin base de datos externa
 
-La aplicacion es **totalmente funcional sin archivos externos**. Al no detectar una base Access configurada, automaticamente utiliza **datos stub** que simulan una flota realista de 111 modulos (86 CSR + 25 Toshiba).
+La aplicacion es **totalmente funcional sin archivos externos**. Al no detectar una base Access configurada, automaticamente utiliza **datos stub** que simulan una flota realista de 110 modulos (85 CSR + 25 Toshiba).
 
 > **Para evaluadores del TFM**: simplemente ejecute la aplicacion — funcionara con datos generados que demuestran toda la funcionalidad del sistema (vista de flota, Maintenance Planner, proyecciones, ranking de urgencia, etc.).
 
-Las fechas de RG/Puesta en Servicio por modulo estan internalizadas en `core/domain/reference_data.py` — no se requiere ningun archivo CSV externo.
+Las fechas de RG/Puesta en Servicio por modulo estan internalizadas en `core/domain/reference_data.py`. Esto se debe a que esa información es clave para la logica de proyeccion y no se encuentra en la base Access original ya que la flota CSR no ha pasado por proceso de RG/DA aún. Al momento de pasar por ese ciclo de mantenimiento pesado, el sistema actualiza internamente la fecha de RG/DA y a partir de ese momento proyecta los siguientes ciclos con esa nueva fecha como referencia.
 
 ### 4) Levantar PostgreSQL con Docker
 
@@ -367,11 +369,13 @@ core/services/ — 97% coverage
 
 ## Despliegue
 
-El proyecto está desplegado en Railway. Consultar la [Guía de Despliegue](docs/deploy_railway_guide.md) para:
+**URL de produccion:** https://web-production-77ceb.up.railway.app/
 
-- Configuración inicial y variables de entorno
-- Setup de PostgreSQL en producción
-- Recuperación ante incidentes de login
+**Credenciales de evaluacion:**
+- Usuario: `demo`
+- Contraseña: `DemoArsMP2026!`
+
+Para detalles tecnicos del despliegue, consultar la [Guia de Despliegue](docs/deploy_railway_guide.md).
 
 ## Slides de presentacion
 

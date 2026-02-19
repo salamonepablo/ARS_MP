@@ -9,8 +9,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load .env only outside Railway to avoid precedence conflicts.
+if not os.getenv("RAILWAY_ENVIRONMENT"):
+    load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -126,16 +127,32 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 DB_ENGINE = os.getenv("DJANGO_DB_ENGINE", "sqlite").lower()
 
-# Support both POSTGRES_* (local docker) and PG* (Railway) variable names
+IS_RAILWAY = bool(os.getenv("RAILWAY_ENVIRONMENT"))
+
+# Support both POSTGRES_* (local docker) and PG* (Railway) variable names.
+# Railway must prioritize PG* vars to avoid accidental .env precedence.
 if DB_ENGINE == "postgres" or os.getenv("POSTGRES_DB") or os.getenv("PGDATABASE"):
+    if IS_RAILWAY:
+        db_name = os.getenv("PGDATABASE") or os.getenv("POSTGRES_DB", "ars_mp")
+        db_user = os.getenv("PGUSER") or os.getenv("POSTGRES_USER", "ars_mp")
+        db_password = os.getenv("PGPASSWORD") or os.getenv("POSTGRES_PASSWORD", "ars_mp")
+        db_host = os.getenv("PGHOST") or os.getenv("POSTGRES_HOST", "localhost")
+        db_port = os.getenv("PGPORT") or os.getenv("POSTGRES_PORT", "5432")
+    else:
+        db_name = os.getenv("POSTGRES_DB") or os.getenv("PGDATABASE", "ars_mp")
+        db_user = os.getenv("POSTGRES_USER") or os.getenv("PGUSER", "ars_mp")
+        db_password = os.getenv("POSTGRES_PASSWORD") or os.getenv("PGPASSWORD", "ars_mp")
+        db_host = os.getenv("POSTGRES_HOST") or os.getenv("PGHOST", "localhost")
+        db_port = os.getenv("POSTGRES_PORT") or os.getenv("PGPORT", "5432")
+
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("POSTGRES_DB") or os.getenv("PGDATABASE", "ars_mp"),
-            "USER": os.getenv("POSTGRES_USER") or os.getenv("PGUSER", "ars_mp"),
-            "PASSWORD": os.getenv("POSTGRES_PASSWORD") or os.getenv("PGPASSWORD", "ars_mp"),
-            "HOST": os.getenv("POSTGRES_HOST") or os.getenv("PGHOST", "localhost"),
-            "PORT": os.getenv("POSTGRES_PORT") or os.getenv("PGPORT", "5432"),
+            "NAME": db_name,
+            "USER": db_user,
+            "PASSWORD": db_password,
+            "HOST": db_host,
+            "PORT": db_port,
         }
     }
 else:

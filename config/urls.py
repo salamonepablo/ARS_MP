@@ -3,6 +3,7 @@ URL configuration for ARS_MP project.
 """
 
 import logging
+import os
 
 from django.contrib import admin
 from django.contrib.auth import authenticate, login, views as auth_views
@@ -45,7 +46,9 @@ urlpatterns = [
     path("accounts/", include("django.contrib.auth.urls")),
     # Fleet app
     path("fleet/", include("web.fleet.urls")),
-    path("__reload__/", include("django_browser_reload.urls")),
     # Redirect root to fleet modules
     path("", lambda request: redirect("fleet:module_list")),
 ]
+
+if os.getenv("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes") and not os.getenv("RAILWAY_ENVIRONMENT"):
+    urlpatterns.append(path("__reload__/", include("django_browser_reload.urls")))

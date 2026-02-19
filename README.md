@@ -6,7 +6,7 @@ Sistema de proyeccion y planificacion de mantenimiento ferroviario para el mater
 
 ## Problema que resuelve
 
-La operadora ferroviaria gestiona **111 modulos** (86 CSR + 25 Toshiba) con sistemas legacy heterogeneos: bases Access (.mdb/.accdb) desde los años 90, planillas Excel manuales y aplicaciones VB6. No existe una vista unificada que permita:
+La operadora ferroviaria gestiona **110 modulos** (85 CSR + 25 Toshiba) con sistemas legacy heterogeneos: bases Access (.mdb/.accdb) desde los años 90, planillas Excel manuales y aplicaciones VB6. No existe una vista unificada que permita:
 
 - Ver el estado de mantenimiento de toda la flota en un solo lugar
 - Proyectar cuando cada modulo alcanzara su proximo ciclo de mantenimiento pesado
@@ -37,7 +37,7 @@ ARS_MP resuelve esto con un pipeline ETL que normaliza datos legacy y una interf
 #### Toshiba
 ![Tarjetas de Flota Toshiba](docs/images/image-2.png)
 
-*111 tarjetas con KM mensual, KM total, ultimo mantenimiento y dias transcurridos. Filtrable por flota (CSR / Toshiba).*
+*110 tarjetas con KM mensual, KM total, ultimo mantenimiento y dias transcurridos. Filtrable por flota (CSR / Toshiba).*
 
 ### Detalle de modulo
 
@@ -82,7 +82,7 @@ ARS_MP resuelve esto con un pipeline ETL que normaliza datos legacy y una interf
 | Frontend | Django Templates + HTMX + Alpine.js |
 | Estilos | Tailwind CSS v4 |
 | Contenedores | Docker Compose (PostgreSQL) |
-| Testing | pytest (248 tests) + coverage |
+| Testing | pytest (252 tests) + coverage |
 | Export | openpyxl (Excel con formato) |
 | Control de versiones | Git + GitHub |
 
@@ -106,13 +106,13 @@ ARS_MP/
 │   └── fleet/             # Vistas: flota, detalle, planner, export
 │       ├── views.py
 │       ├── urls.py
-│       ├── stub_data.py   # Datos de fallback (111 modulos)
+│       ├── stub_data.py   # Datos de fallback (110 modulos)
 │       └── templates/
 ├── infrastructure/        # Implementaciones concretas
 │   └── database/          # Modelos Django (StgModulo, StgKilometraje, etc.)
 ├── templates/             # Base templates (navbar, layout)
 ├── theme/                 # Tailwind CSS v4
-├── tests/                 # 248 tests (97% coverage en core/)
+├── tests/                 # 252 tests (97% coverage en core/)
 ├── docs/                  # Documentacion del proyecto
 │   ├── decisions/         # ADRs (Architecture Decision Records)
 │   ├── images/            # Screenshots del README
@@ -137,7 +137,7 @@ ARS_MP/
 
 - **Separation of Concerns**: `core/` no importa Django. `etl/` no conoce la UI. `web/` orquesta.
 - **Dependency Inversion**: La logica de negocio define interfaces; la infraestructura las implementa.
-- **Fallback graceful**: Si Access no esta disponible, el sistema usa datos stub (111 modulos).
+- **Fallback graceful**: Si Access no esta disponible, el sistema usa datos stub (110 modulos).
 - **Read-only ETL**: Todas las conexiones a bases legacy son `ReadOnly=1` por seguridad.
 
 ## Funcionalidades principales
@@ -156,7 +156,7 @@ ARS_MP/
 - **Sync incremental**: Comando `py manage.py sync_access` con logging y estadisticas
 - **Fallback**: Si la BD Access no esta disponible, la app funciona con datos stub
 
-### 3. Vista de flota (111 tarjetas)
+### 3. Vista de flota (110 tarjetas)
 
 - **URL**: `/fleet/modules/`
 - Tarjetas por modulo con: KM mes, KM total, ultimo mantenimiento, tipo, fecha, dias transcurridos
@@ -315,7 +315,7 @@ py -m pytest -m ""
 ### Resultados actuales
 
 ```
-248 passed, 2 deselected (integration)
+252 passed, 2 deselected (integration)
 core/services/ — 97% coverage
 ```
 
@@ -335,7 +335,7 @@ core/services/ — 97% coverage
 | Fleet views | 24 | |
 | PostgreSQL extractor | 26 | |
 | Access connection | 17 | |
-| Stub data | 22 | |
+| Stub data | 26 | |
 | Domain entities | 74 | |
 | Reference data | 13 | |
 
@@ -347,7 +347,7 @@ core/services/ — 97% coverage
 | `etl/` | Pipeline ETL: extractores (Access, PostgreSQL), transformadores, loaders. |
 | `web/fleet/` | App Django: vistas, templates, URLs, template tags. |
 | `infrastructure/` | Modelos Django (staging tables), integraciones externas. |
-| `tests/` | 248 tests organizados por modulo. |
+| `tests/` | 252 tests organizados por modulo. |
 | `docs/` | Documentacion tecnica en ingles: ADRs, schema legacy, screenshots, CHANGELOG. |
 | `context/` | Reglas de negocio en espanol. |
 | `scripts/` | Utilidades: test de conexion, toggle de path local/remoto. |

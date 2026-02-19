@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Literal
 
+from core.domain.reference_data import RG_REFERENCE_DATES
+
 
 @dataclass
 class CoachInfo:
@@ -143,7 +145,54 @@ def _get_month_name_es(month_number: int) -> str:
     return ""
 
 
+# =============================================================================
+# Coach composition generation
+# =============================================================================
+
+# CSR coach number ranges by configuration
+# Cuadruplas (4 coches): MC1 (5000s), R1 (4000s), R2 (4500s), MC2 (5500s)
+# Triplas (3 coches): MC1 (5000s), R1 (4000s), MC2 (5500s)
+CSR_COACH_BASES = {
+    "cuadrupla": [("MC1", 5000), ("R1", 4000), ("R2", 4500), ("MC2", 5500)],
+    "tripla": [("MC1", 5000), ("R1", 4000), ("MC2", 5500)],
+}
+
+# Toshiba coach number ranges
+# Cuadruplas: M (2000s), R (2200s), R (2400s), M (2600s)
+# Triplas: M (2000s), R (2200s), M (2600s)
+TOSHIBA_COACH_BASES = {
+    "cuadrupla": [("M", 2000), ("R", 2200), ("R", 2400), ("M", 2600)],
+    "tripla": [("M", 2000), ("R", 2200), ("M", 2600)],
+}
+
+
+def _generate_coach_composition(
+    module_number: int,
+    fleet_type: Literal["CSR", "Toshiba"],
+    configuration: Literal["tripla", "cuadrupla"],
+) -> list[CoachInfo]:
+    """Generate realistic coach composition for a module.
+
+    Coach numbers are derived from the module number to maintain consistency.
+    """
+    if fleet_type == "CSR":
+        bases = CSR_COACH_BASES[configuration]
+    else:
+        bases = TOSHIBA_COACH_BASES[configuration]
+
+    coaches = []
+    for coach_type, base_number in bases:
+        # Generate coach number based on module number for consistency
+        coach_number = base_number + module_number
+        coaches.append(CoachInfo(number=coach_number, coach_type=coach_type))
+
+    return coaches
+
+
+# =============================================================================
 # Maintenance cycle definitions
+# =============================================================================
+
 CSR_CYCLES = [
     ("AN", "Anual (AN)", 187_500),
     ("BA", "Bianual (BA)", 375_000),
@@ -285,6 +334,7 @@ def generate_csr_modules() -> list[ModuleData]:
     Rules:
     - M01-M42: cuadruplas (4 coaches)
     - M43-M86: triplas (3 coaches)
+    - M67 excluded: never commissioned, used as parts donor
     """
     modules = []
     maintenance_types = ["IQ", "IB", "AN", "BA", "RS", "DA"]
@@ -292,6 +342,10 @@ def generate_csr_modules() -> list[ModuleData]:
     for i in range(1, 87):
         module_number = i
         module_id = f"M{module_number:02d}"
+
+        # M67 excluded - never commissioned
+        if module_number == 67:
+            continue
 
         # Cuadruplas: 1-42, Triplas: 43-86
         if module_number <= 42:
@@ -308,9 +362,17 @@ def generate_csr_modules() -> list[ModuleData]:
         last_maint_date = date.today() - timedelta(days=days_ago)
         km_at_maint = km_total - random.randint(5_000, 50_000)
 
+        # Get reference date from domain data
+        ref_data = RG_REFERENCE_DATES.get(module_id)
+        reference_date = ref_data[0] if ref_data else None
+        reference_type = ref_data[1] if ref_data else ""
+
+        # Generate coach composition
+        coaches = _generate_coach_composition(module_number, "CSR", configuration)
+
         # Generate detail data
         history = _generate_maintenance_history("CSR", km_total, date.today())
-        key_data = _generate_key_data_csr(km_total, None)
+        key_data = _generate_key_data_csr(km_total, reference_date)
 
         modules.append(
             ModuleData(
@@ -325,6 +387,9 @@ def generate_csr_modules() -> list[ModuleData]:
                 last_maintenance_type=random.choice(maintenance_types),
                 km_at_last_maintenance=km_at_maint,
                 km_current_month_date=date.today(),
+                coaches=coaches,
+                reference_date=reference_date,
+                reference_type=reference_type,
                 maintenance_history=history,
                 maintenance_key_data=key_data,
             )
@@ -337,20 +402,30 @@ def generate_toshiba_modules() -> list[ModuleData]:
     """
     Generate stub data for 25 Toshiba modules.
 
+    Uses actual Toshiba module IDs from reference_data (T04, T06, T09, etc.)
+    with their real RG dates.
+
     Rules:
-    - 13 triplas (3 coaches)
-    - 12 cuadruplas (4 coaches)
+    - Cuadruplas: T04-T22 (even numbered, some gaps)
+    - Triplas: T28-T52 (higher numbers)
     - RG cycle is every 600,000 km
     """
     modules = []
     maintenance_types = ["MEN", "RB", "RG"]
 
-    # First 12 are cuadruplas, next 13 are triplas
-    for i in range(1, 26):
-        module_number = i
-        module_id = f"T{module_number:02d}"
+    # Get actual Toshiba module IDs from reference data
+    toshiba_ids = sorted(
+        [mid for mid in RG_REFERENCE_DATES.keys() if mid.startswith("T")],
+        key=lambda x: int(x[1:])
+    )
 
-        if module_number <= 12:
+    # Cuadruplas: first 12 modules, Triplas: remaining 13
+    cuadrupla_ids = toshiba_ids[:12]
+
+    for module_id in toshiba_ids:
+        module_number = int(module_id[1:])
+
+        if module_id in cuadrupla_ids:
             configuration = "cuadrupla"
             coach_count = 4
         else:
@@ -364,15 +439,22 @@ def generate_toshiba_modules() -> list[ModuleData]:
         last_maint_date = date.today() - timedelta(days=days_ago)
         km_at_maint = km_total - random.randint(8_000, 60_000)
 
-        # Generate RG data (last RG was some time ago, between 100-500k km ago)
-        # RG cycle is 600,000 km, so km_since_rg should be 0-600k
-        km_since_last_rg = random.randint(50_000, 550_000)
-        km_at_last_rg = km_total - km_since_last_rg
-        if km_at_last_rg < 0:
-            km_at_last_rg = 0
-        # RG date: estimate based on ~10k km/month average
-        months_since_rg = km_since_last_rg // 10_000
-        last_rg_date = date.today() - timedelta(days=months_since_rg * 30)
+        # Get real RG date from reference data
+        ref_data = RG_REFERENCE_DATES.get(module_id)
+        last_rg_date = ref_data[0] if ref_data else None
+        reference_type = ref_data[1] if ref_data else "RG"
+
+        # Calculate km at last RG based on date (estimate ~260 km/day average for Toshiba)
+        if last_rg_date:
+            days_since_rg = (date.today() - last_rg_date).days
+            km_since_last_rg = min(int(days_since_rg * 260), km_total)
+            km_at_last_rg = max(0, km_total - km_since_last_rg)
+        else:
+            km_since_last_rg = random.randint(50_000, 550_000)
+            km_at_last_rg = max(0, km_total - km_since_last_rg)
+
+        # Generate coach composition
+        coaches = _generate_coach_composition(module_number, "Toshiba", configuration)
 
         # Generate detail data
         history = _generate_maintenance_history("Toshiba", km_total, date.today())
@@ -391,6 +473,9 @@ def generate_toshiba_modules() -> list[ModuleData]:
                 last_maintenance_type=random.choice(maintenance_types),
                 km_at_last_maintenance=km_at_maint,
                 km_current_month_date=date.today(),
+                coaches=coaches,
+                reference_date=last_rg_date,
+                reference_type=reference_type,
                 last_rg_date=last_rg_date,
                 km_at_last_rg=km_at_last_rg,
                 maintenance_history=history,

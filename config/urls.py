@@ -20,10 +20,15 @@ class DebugLoginView(auth_views.LoginView):
         return super().form_valid(form)
 
     def form_invalid(self, form):
+        import os
         from django.conf import settings
         from django.contrib.auth.models import User
         logger.warning("LOGIN FAILED: errors=%s", form.errors)
-        logger.warning("DATABASE: %s", settings.DATABASES['default']['HOST'])
+        logger.warning("DATABASE ENGINE: %s", settings.DATABASES['default']['ENGINE'])
+        logger.warning("DATABASE HOST: %s", settings.DATABASES['default'].get('HOST', 'N/A'))
+        logger.warning("DATABASE NAME: %s", settings.DATABASES['default'].get('NAME', 'N/A'))
+        logger.warning("PGHOST env: %s", os.getenv('PGHOST', 'NOT SET'))
+        logger.warning("PGDATABASE env: %s", os.getenv('PGDATABASE', 'NOT SET'))
         logger.warning("USERS IN DB: %s", list(User.objects.values_list('username', flat=True)))
         # Try manual authentication for debugging
         username = self.request.POST.get("username")

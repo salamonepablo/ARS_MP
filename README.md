@@ -404,4 +404,4 @@ La presentacion del TFM esta disponible en el repositorio:
 
 ---
 
-*Proyecto academico. Datos operativos reales de Linea Roca (Trenes Argentinos) utilizados con fines de desarrollo y demostracion.*
+*Proyecto académico. Datos operativos de Línea Roca (Trenes Argentinos) utilizados con fines de desarrollo y demostración.*

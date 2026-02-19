@@ -126,15 +126,16 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 DB_ENGINE = os.getenv("DJANGO_DB_ENGINE", "sqlite").lower()
 
-if DB_ENGINE == "postgres" or os.getenv("POSTGRES_DB"):
+# Support both POSTGRES_* (local docker) and PG* (Railway) variable names
+if DB_ENGINE == "postgres" or os.getenv("POSTGRES_DB") or os.getenv("PGDATABASE"):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("POSTGRES_DB", "ars_mp"),
-            "USER": os.getenv("POSTGRES_USER", "ars_mp"),
-            "PASSWORD": os.getenv("POSTGRES_PASSWORD", "ars_mp"),
-            "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+            "NAME": os.getenv("POSTGRES_DB") or os.getenv("PGDATABASE", "ars_mp"),
+            "USER": os.getenv("POSTGRES_USER") or os.getenv("PGUSER", "ars_mp"),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD") or os.getenv("PGPASSWORD", "ars_mp"),
+            "HOST": os.getenv("POSTGRES_HOST") or os.getenv("PGHOST", "localhost"),
+            "PORT": os.getenv("POSTGRES_PORT") or os.getenv("PGPORT", "5432"),
         }
     }
 else:

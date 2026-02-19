@@ -365,10 +365,13 @@ core/services/ — 97% coverage
 | [docs/ai_workflow.md](docs/ai_workflow.md) | Proceso de desarrollo asistido con IA |
 | [context/prompts/](context/prompts/) | Prompts utilizados para generar el codigo con IA |
 
-<!-- ## Despliegue
+## Despliegue
 
-TODO: Agregar informacion de despliegue cuando se defina la estrategia.
--->
+El proyecto está desplegado en Railway. Consultar la [Guía de Despliegue](docs/deploy_railway_guide.md) para:
+
+- Configuración inicial y variables de entorno
+- Setup de PostgreSQL en producción
+- Recuperación ante incidentes de login
 
 ## Slides de presentacion
 

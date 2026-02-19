@@ -52,8 +52,8 @@ INTERNAL_IPS = ["127.0.0.1"]
 # Security settings for production (Railway)
 if os.getenv("RAILWAY_ENVIRONMENT"):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    # SESSION_COOKIE_SECURE = True  # Disabled for debugging
-    # CSRF_COOKIE_SECURE = True  # Disabled for debugging
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 
 # =============================================================================
@@ -220,9 +220,12 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 STATICFILES_DIRS = [
-    BASE_DIR / "static",
-    BASE_DIR / "theme" / "static",
-    BASE_DIR / "web" / "static",
+    static_dir
+    for static_dir in [
+        BASE_DIR / "static",
+        BASE_DIR / "web" / "static",
+    ]
+    if static_dir.exists()
 ]
 
 # Production static files (collectstatic output)

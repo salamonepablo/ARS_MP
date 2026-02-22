@@ -1,5 +1,7 @@
 # ARS_MP — Argentinian Rolling Stock Maintenance Planner
 
+[![CI](https://github.com/salamonepablo/ARS_MP/actions/workflows/ci.yml/badge.svg)](https://github.com/salamonepablo/ARS_MP/actions/workflows/ci.yml)
+
 > **Trabajo Final de Master — Master en Desarrollo con IA (BIG School)**
 
 Sistema de proyeccion y planificacion de mantenimiento ferroviario para el material rodante de **Linea Roca** (Buenos Aires, Argentina). Herramienta ETL intermedia con interfaz web que extrae datos de sistemas legacy, proyecta kilometrajes por ciclo de mantenimiento pesado y genera grillas interactivas para la toma de decisiones operativas.
@@ -311,6 +313,10 @@ py -m pytest -m integration
 # Todos los tests, incluyendo integracion
 py -m pytest -m ""
 ```
+
+### CI/CD
+
+El proyecto usa [GitHub Actions](.github/workflows/ci.yml) para integración continua. En cada push/PR se ejecuta: verificación Django, chequeo de migraciones y tests con pytest.
 
 ### Resultados actuales
 

@@ -9,7 +9,6 @@ Tests cover:
 - Full grid generation for fleet
 """
 
-import pytest
 from datetime import date
 
 from core.services.grid_projection import (
@@ -17,7 +16,6 @@ from core.services.grid_projection import (
     DEFAULT_AVG_MONTHLY_KM,
     CYCLE_COLORS,
     MonthProjection,
-    CycleRow,
     ModuleGridData,
     ModuleRankingEntry,
     GridProjectionService,

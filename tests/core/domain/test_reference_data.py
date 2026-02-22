@@ -5,7 +5,6 @@ estan correctamente definidos y tienen el formato esperado.
 """
 from datetime import date
 
-import pytest
 
 from core.domain.reference_data import RG_REFERENCE_DATES
 

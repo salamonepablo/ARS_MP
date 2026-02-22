@@ -69,7 +69,7 @@ class TestAuthenticatedAccess:
 
     @pytest.fixture
     def authenticated_client(self):
-        user = User.objects.create_user(
+        User.objects.create_user(
             username="analista",
             password="testpass123!",
             email="analista@trenesargentinos.gob.ar",

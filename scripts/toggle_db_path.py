@@ -24,7 +24,7 @@ def show_current():
     
     for line in content.split('\n'):
         if line.startswith('LEGACY_ACCESS_DB_PATH='):
-            print(f"📌 Current DB path:")
+            print("📌 Current DB path:")
             print(f"   {line.strip()}")
             break
     else:

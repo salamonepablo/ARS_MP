@@ -8,12 +8,10 @@ Tests cover:
 - Edge cases: no data, single cycle, overdue cycles
 """
 
-import pytest
 from datetime import date, timedelta
 import math
 
 from core.services.maintenance_projection import (
-    AVG_DAILY_KM,
     CSR_MAINTENANCE_CYCLES,
     TOSHIBA_MAINTENANCE_CYCLES,
     CSR_HIERARCHY,
@@ -21,7 +19,6 @@ from core.services.maintenance_projection import (
     TASK_TO_CYCLE,
     MaintenanceHistoryService,
     MaintenanceProjectionService,
-    ProjectionResult,
 )
 
 

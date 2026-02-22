@@ -210,7 +210,7 @@ def get_access_connection() -> "pyodbc.Connection":
         error_msg = str(e)
         if "authentication" in error_msg.lower() or "password" in error_msg.lower():
             raise AccessConnectionError(
-                f"Authentication failed for Access database. Check password."
+                "Authentication failed for Access database. Check password."
             ) from e
         raise AccessConnectionError(
             f"Failed to connect to Access database: {error_msg}"

@@ -16,17 +16,15 @@ Design decision (see docs/decisions/access_to_postgres_staging.md):
 import logging
 import re
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Literal, Optional
 
-from django.db.models import Max, Min, Q, Subquery, OuterRef
+from django.db.models import Max, Min
 
 from core.services.maintenance_projection import (
-    CSR_HEAVY_CYCLES,
     CSR_HIERARCHY,
     CSR_MAINTENANCE_CYCLES,
     TASK_TO_CYCLE,
-    TOSHIBA_HEAVY_CYCLES,
     TOSHIBA_HIERARCHY,
     TOSHIBA_MAINTENANCE_CYCLES,
 )
@@ -482,11 +480,9 @@ def get_module_detail_from_postgres(
     # Use ALL cycles for projection, but HEAVY cycles for display table
     if fleet_type == "CSR":
         all_cycles = CSR_MAINTENANCE_CYCLES
-        heavy_cycles = CSR_HEAVY_CYCLES
         hierarchy = CSR_HIERARCHY
     else:
         all_cycles = TOSHIBA_MAINTENANCE_CYCLES
-        heavy_cycles = TOSHIBA_HEAVY_CYCLES
         hierarchy = TOSHIBA_HIERARCHY
 
     # Build lookup: task -> (latest_date, km)

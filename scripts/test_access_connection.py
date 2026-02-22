@@ -33,34 +33,34 @@ try:
     conn = pyodbc.connect(conn_string, timeout=timeout)
     cursor = conn.cursor()
     
-    print(f'✅ CONEXIÓN ODBC EXITOSA')
+    print('✅ CONEXIÓN ODBC EXITOSA')
     
     # Enlistar tablas accesibles
     tables = list(cursor.tables(tableType='TABLE'))
     print(f'\n📊 Tablas disponibles: {len(tables)}')
     
     if tables:
-        print(f'\n📋 Primeras 10 tablas:')
+        print('\n📋 Primeras 10 tablas:')
         for i, table in enumerate(tables[:10]):
             print(f'  {i+1}. {table[2]}')  # table[2] es el nombre de la tabla
     
     # Intentar query en una tabla conocida
-    print(f'\n🔍 Verificando acceso a datos reales...')
+    print('\n🔍 Verificando acceso a datos reales...')
     try:
         # Access usa TOP en lugar de LIMIT
         cursor.execute("SELECT TOP 1 * FROM [A_00_Kilometrajes]")
         row = cursor.fetchone()
         if row:
-            print(f'✅ Tabla "A_00_Kilometrajes" accesible')
+            print('✅ Tabla "A_00_Kilometrajes" accesible')
             cols = [desc[0] for desc in cursor.description]
             print(f'   Columnas ({len(cols)}): {", ".join(cols[:5])}...')
         else:
-            print(f'⚠️  Tabla "A_00_Kilometrajes" vacía')
+            print('⚠️  Tabla "A_00_Kilometrajes" vacía')
     except Exception as e:
         print(f'⚠️  No se pudo acceder a "A_00_Kilometrajes": {e}')
     
     conn.close()
-    print(f'\n✅ Prueba completada exitosamente')
+    print('\n✅ Prueba completada exitosamente')
 except Exception as e:
     print(f'❌ ERROR: {type(e).__name__}: {e}')
     import traceback

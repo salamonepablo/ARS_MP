@@ -27,15 +27,15 @@ jobs:
         run: |
           python -m pip install -U pip
           pip install -r requirements.txt
+          pip install ruff
 
-      - name: Django check
+      - name: Django checks
         run: |
           python manage.py check
-
-      - name: Ensure migrations are up to date
-        run: |
           python manage.py makemigrations --check --dry-run
 
-      - name: Run tests (pytest)
-        run: |
-          pytest -q
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Tests + coverage
+        run: pytest -q --cov --cov-report=term-missing

@@ -18,7 +18,6 @@ from django.views.decorators.http import require_GET, require_POST
 import json
 
 from core.services.grid_projection import (
-    CYCLE_COLORS,
     DEFAULT_AVG_MONTHLY_KM,
     DEFAULT_MONTHS,
     GridProjectionService,

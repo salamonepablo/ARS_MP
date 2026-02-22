@@ -11,7 +11,6 @@ Tests cover:
 from unittest.mock import patch
 
 import pytest
-from django.test import Client
 
 from web.fleet.stub_data import get_all_modules
 

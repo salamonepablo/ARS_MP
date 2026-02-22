@@ -8,12 +8,9 @@ Tests cover:
 - Fleet summary calculations
 """
 
-import pytest
 from datetime import date, timedelta
 from web.fleet.stub_data import (
     ModuleData,
-    generate_csr_modules,
-    generate_toshiba_modules,
     get_all_modules,
     get_fleet_summary,
 )

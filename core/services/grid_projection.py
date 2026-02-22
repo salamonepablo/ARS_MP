@@ -15,7 +15,7 @@ from __future__ import annotations
 import calendar
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Literal, Optional
+from typing import Literal
 
 from core.services.maintenance_projection import (
     CSR_HEAVY_CYCLES,

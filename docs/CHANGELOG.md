@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Ruff linter in CI pipeline**: static code analysis to catch unused imports, f-string issues, and code style problems. Configured in `pyproject.toml` (line-length 120, Python 3.11 target).
+
+- **Coverage reporting in CI**: pytest now runs with `--cov --cov-report=term-missing` to show test coverage in GitHub Actions logs (79% overall, 97%+ on core/).
+
 - **Maintenance Priority Ranking modal** (`Ctrl+M` or "Prioridad Mant." button):
   - Shows all modules ranked by km since last DA/RG intervention (descending order)
   - Columns: rank, module ID, km since reference, reference date, reference type

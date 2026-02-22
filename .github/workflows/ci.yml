@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DJANGO_DEBUG: "False"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      DJANGO_DB_ENGINE: "sqlite"
+      DJANGO_SECRET_KEY: "ci-only-secret"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt
+
+      - name: Django check
+        run: |
+          python manage.py check
+
+      - name: Ensure migrations are up to date
+        run: |
+          python manage.py makemigrations --check --dry-run
+
+      - name: Run tests (pytest)
+        run: |
+          pytest -q
